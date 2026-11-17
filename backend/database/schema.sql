@@ -18,6 +18,7 @@ CREATE TABLE categorias (
   usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
   nome        VARCHAR(60) NOT NULL,
   tipo        VARCHAR(7)  NOT NULL CHECK (tipo IN ('entrada', 'saida')),
+  cor         SMALLINT    NOT NULL DEFAULT 1 CHECK (cor BETWEEN 1 AND 8), 
   UNIQUE (usuario_id, nome, tipo)
 );
 

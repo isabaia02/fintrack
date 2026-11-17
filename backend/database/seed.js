@@ -2,18 +2,13 @@ import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcrypt';
 import pg from 'pg';
+import { categoriasPadrao } from '../src/models/padroes.js';
 
 const SENHA = 'senha1234'; // senha dos usuários de demonstração
 
 const usuarios = [
   { nome: 'Ana Souza', email: 'ana@email.com', cpf: '52998224725' },
   { nome: 'Bruno Lima', email: 'bruno@email.com', cpf: '11144477735' },
-];
-
-const categoriasPadrao = [
-  ['Salário', 'entrada'], ['Outros', 'entrada'],
-  ['Alimentação', 'saida'], ['Moradia', 'saida'], ['Saúde', 'saida'],
-  ['Mobilidade', 'saida'], ['Lazer', 'saida'], ['Educação', 'saida'], ['Outros', 'saida'],
 ];
 
 const fontes = [
@@ -48,10 +43,10 @@ try {
     );
 
     const cat = {};
-    for (const [nome, tipo] of categoriasPadrao) {
+    for (const { nome, tipo, cor } of categoriasPadrao) {
       const { rows: [c] } = await client.query(
-        `INSERT INTO categorias (usuario_id, nome, tipo) VALUES ($1,$2,$3) RETURNING id`,
-        [usr.id, nome, tipo],
+        `INSERT INTO categorias (usuario_id, nome, tipo, cor) VALUES ($1,$2,$3,$4) RETURNING id`,
+        [usr.id, nome, tipo, cor],
       );
       cat[`${nome}:${tipo}`] = c.id;
     }
