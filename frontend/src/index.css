@@ -1,111 +1,125 @@
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+@import 'tailwindcss';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+@import '@fontsource-variable/inter';
+@import '@fontsource/material-icons-outlined';
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+/* Tokens do Figma (modo claro). Cada --color-x vira classe: bg-x, text-x, border-x. */
+@theme static {
+  --color-*: initial;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --color-primary: #1f576b;
+  --color-primary-hover: #18475a;
+  --color-on-primary: #ffffff;
+  --color-accent-soft: #e4eff3;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
+  --color-bg: #fafaf8;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f3f3f0;
+  --color-border: #e6e5e0;
+  --color-border-strong: #8a8f98;
+
+  --color-text: #1b252c;
+  --color-text-muted: #55606a;
+  --color-text-subtle: #6b757e;
+
+  --color-income: #12754a;
+  --color-income-soft: #e7f5ee;
+  --color-danger: #b3261e;
+  --color-danger-soft: #fcecea;
+  --color-warning: #8a5a00;
+  --color-warning-soft: #fbf1dc;
+
+  --color-chart-1: #2a78d6;
+  --color-chart-2: #eb6834;
+  --color-chart-3: #1baf7a;
+  --color-chart-4: #eda100;
+  --color-chart-5: #e87ba4;
+  --color-chart-6: #008300;
+  --color-chart-7: #6250d6;
+  --color-chart-8: #e34948;
+  --color-chart-other: #8a8f98;
+
+  --font-sans: 'Geist Variable', 'Inter Variable', system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --shadow-popover: 0 8px 24px rgb(0 0 0 / 0.08);
+
+  --text-display: 48px;
+  --text-display--line-height: 52px;
+  --text-display--letter-spacing: -0.02em;
+}
+
+/* Modo escuro: <html data-theme="dark"> */
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-primary: #7fbbd1;
+  --color-primary-hover: #9ac9db;
+  --color-on-primary: #0f1315;
+  --color-accent-soft: #1a2b33;
+
+  --color-bg: #0f1315;
+  --color-surface: #161b1f;
+  --color-surface-sunken: #1c2227;
+  --color-border: #272f36;
+  --color-border-strong: #6b7680;
+
+  --color-text: #eceff1;
+  --color-text-muted: #a3adb5;
+  --color-text-subtle: #8a949c;
+
+  --color-income: #4cc38a;
+  --color-income-soft: #14281f;
+  --color-danger: #f28b82;
+  --color-danger-soft: #3a1b19;
+  --color-warning: #e5b450;
+  --color-warning-soft: #33290f;
+
+  --color-chart-1: #3987e5;
+  --color-chart-2: #d95926;
+  --color-chart-3: #199e70;
+  --color-chart-4: #c98500;
+  --color-chart-5: #d55181;
+  --color-chart-6: #0ca30c;
+  --color-chart-7: #9085e9;
+  --color-chart-8: #e66767;
+  --color-chart-other: #6b7680;
+}
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
+  body {
+    @apply bg-bg font-sans text-sm text-text antialiased;
+  }
+  h1 {
+    @apply text-[28px] leading-[34px] font-semibold tracking-[-0.01em];
+  }
+  h2 {
+    @apply text-xl leading-7 font-semibold tracking-[-0.005em];
+  }
+  h3 {
+    @apply text-base font-semibold;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-body {
-  margin: 0;
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+@utility material-icons-outlined {
+  font-family: 'Material Icons Outlined';
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1;
+  white-space: nowrap;
+  font-feature-settings: 'liga';
 }

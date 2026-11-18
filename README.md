@@ -4,7 +4,7 @@ Projeto 2 de Desenvolvimento Web Full Stack: API REST (Node.js/Express + Postgre
 
 ## Tecnologias
 - **Back-end:** Node.js 20+, Express, pg (PostgreSQL, com pool), bcrypt, jsonwebtoken, cors, dotenv, express-rate-limit
-- **Front-end:** React, Vite, React Router, Axios, Recharts
+- **Front-end:** React, Vite, React Router, Axios, Recharts, Tailwind CSS v4, Material Icons (Outlined)
 - **Banco:** PostgreSQL
 
 ## Estrutura
@@ -18,7 +18,7 @@ backend/
     middlewares/   autenticar.js (JWT), erros.js
     config/        db.js (pool), jwt.js
 frontend/src/
-  components/  páginas e componentes
+  components/  páginas e componentes (ui/ = componentes base do design system)
   contexts/    AuthContext
   services/    api.js (único cliente HTTP)
 ```
@@ -47,3 +47,8 @@ Usuários do seed: `ana@email.com` e `bruno@email.com` (senha `senha1234`).
 
 ## Rotas
 Implementadas até agora: `GET /api/health`. As demais (auth, categorias, fontes-destinos, lançamentos, relatórios) seguem a tabela 10.5 do enunciado e serão adicionadas.
+
+## Design system (front-end)
+- Tokens do Figma em `frontend/src/index.css`, com modo claro e escuro (`[data-theme="dark"]`). Use as classes do Tailwind (`bg-surface`, `text-text-muted`, `border-border-strong`...), sem cores soltas.
+- Componentes base em `frontend/src/components/ui`: `Button`, `Badge`, `Input`, `Select`, `Segmentado` e `MoneyText`.
+- Ícones: Material Icons (Outlined) com `<Icone nome="add" />`, usando o nome do ícone do Figma.
