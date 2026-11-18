@@ -1,3 +1,3 @@
 export default function Categorias() {
-  return <h1>Categorias</h1>; // TODO
+  return <p className="text-text-muted">Em construção.</p>; // TODO
 }

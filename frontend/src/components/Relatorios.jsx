@@ -1,3 +1,3 @@
 export default function Relatorios() {
-  return <h1>Relatorios</h1>; // TODO
+  return <p className="text-text-muted">Em construção.</p>; // TODO
 }

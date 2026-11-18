@@ -1,3 +1,3 @@
 export default function Dashboard() {
-  return <h1>Dashboard</h1>; // TODO
+  return <p className="text-text-muted">Em construção.</p>; // TODO
 }
