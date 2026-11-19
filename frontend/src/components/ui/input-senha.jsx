@@ -2,12 +2,12 @@ import { useState } from 'react';
 import Icone from '../Icone';
 import { Input } from './input';
 
-export function InputSenha(props) {
+export function InputSenha({ className = '', ...props }) {
   const [visivel, setVisivel] = useState(false);
 
   return (
     <div className="relative">
-      <Input type={visivel ? 'text' : 'password'} className="pr-11" {...props} />
+      <Input {...props} type={visivel ? 'text' : 'password'} className={`pr-11 ${className}`} />
       <button
         type="button"
         onClick={() => setVisivel((atual) => !atual)}
