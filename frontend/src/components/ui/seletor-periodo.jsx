@@ -1,5 +1,5 @@
 import Icone from '../Icone';
-import { usePeriodo } from '../../contexts/PeriodoContext';
+import { usePeriodo } from '../../contexts/periodo';
 
 export function SeletorPeriodo() {
   const { rotulo, anterior, proximo } = usePeriodo();

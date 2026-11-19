@@ -8,8 +8,8 @@ export default function ShellAutenticado() {
     <PeriodoProvider>
       <div className="flex min-h-screen bg-bg">
         <Sidebar />
-        <main className="min-w-0 flex-1">
-          <div className="mx-auto max-w-[1200px] px-10 py-8">
+        <main className="min-w-0 flex-1 px-10 py-8">
+          <div className="mx-auto max-w-[1120px]">
             <Topbar />
             <Outlet />
           </div>

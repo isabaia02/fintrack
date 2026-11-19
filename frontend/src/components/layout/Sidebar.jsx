@@ -16,7 +16,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col gap-6 border-r border-border bg-surface px-3 pt-6 pb-4">
+    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col gap-6 border border-border bg-surface px-3 pt-6 pb-4">
       <div className="flex items-center gap-2 px-3">
         <img src={logoMark} alt="" className="h-7 w-[30px] object-contain" />
         <span className="text-base font-semibold">FinTrack</span>

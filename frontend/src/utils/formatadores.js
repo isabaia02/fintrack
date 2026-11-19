@@ -1,13 +1,16 @@
 // Utilitários de formatação e máscara (pt-BR). Funções puras, sem dependência de React.
 
+const NBSP = String.fromCharCode(0xa0); // espaço não separável que o Intl usa entre "R$" e o número
 const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
 // formatarMoeda(1234.5) -> "R$ 1.234,50"; com sinal: "+ R$ 1.234,50" / "− R$ 1.234,50".
+// O sinal é decidido pelo valor arredondado em centavos (-0.004 vira "R$ 0,00", sem sinal).
 export function formatarMoeda(valor, { comSinal = false } = {}) {
-  const numero = moeda.format(Math.abs(Number(valor) || 0)).replace(/ /g, ' ');
-  if (!Number(valor)) return numero;
-  if (comSinal) return `${valor > 0 ? '+' : '−'} ${numero}`;
-  return valor < 0 ? `− ${numero}` : numero;
+  const centavos = Math.round((Number(valor) || 0) * 100);
+  const numero = moeda.format(Math.abs(centavos) / 100).replaceAll(NBSP, ' ');
+  if (centavos === 0) return numero;
+  if (comSinal) return `${centavos > 0 ? '+' : '−'} ${numero}`;
+  return centavos < 0 ? `− ${numero}` : numero;
 }
 
 // formatarData('2026-11-18') ou Date -> "18/11/2026". Strings ISO não passam por fuso horário.
