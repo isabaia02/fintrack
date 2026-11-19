@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
   const [carregando, setCarregando] = useState(Boolean(token));
+  const [sessaoExpirada, setSessaoExpirada] = useState(false);
 
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY);
@@ -14,7 +15,12 @@ export function AuthProvider({ children }) {
     setUsuario(null);
   };
 
-  useEffect(() => { definirAoNaoAutorizado(logout); }, []);
+  useEffect(() => {
+    definirAoNaoAutorizado((erro) => {
+      if (erro.response?.data?.codigo === 'SESSAO_EXPIRADA') setSessaoExpirada(true);
+      logout();
+    });
+  }, []);
 
   useEffect(() => {
     if (!token) { setCarregando(false); return; }
@@ -27,6 +33,7 @@ export function AuthProvider({ children }) {
   const login = async (email, senha) => {
     const { data } = await api.post('/auth/login', { email, senha });
     localStorage.setItem(TOKEN_KEY, data.token);
+    setSessaoExpirada(false);
     setToken(data.token);
     setUsuario(data.usuario);
   };
@@ -34,7 +41,7 @@ export function AuthProvider({ children }) {
   const cadastrar = (dados) => api.post('/auth/cadastro', dados);
 
   return (
-    <AuthContext.Provider value={{ usuario, token, carregando, login, logout, cadastrar }}>
+    <AuthContext.Provider value={{ usuario, token, carregando, sessaoExpirada, login, logout, cadastrar }}>
       {children}
     </AuthContext.Provider>
   );
