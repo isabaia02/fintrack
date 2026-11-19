@@ -16,7 +16,7 @@ export const definirAoNaoAutorizado = (fn) => { aoNaoAutorizado = fn; };
 api.interceptors.response.use(
   (res) => res,
   (erro) => {
-    if (erro.response?.status === 401) aoNaoAutorizado();
+    if (erro.response?.status === 401) aoNaoAutorizado(erro);
     return Promise.reject(erro);
   },
 );
