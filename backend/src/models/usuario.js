@@ -40,3 +40,19 @@ export function campoDuplicado(erro) {
   if (erro.constraint?.includes('email')) return 'email';
   return null;
 }
+
+export async function buscarPorEmail(email) {
+  const { rows } = await pool.query(
+    `SELECT ${CAMPOS_PUBLICOS}, senha_hash FROM usuarios WHERE email = $1`,
+    [email],
+  );
+  return rows[0] ?? null;
+}
+
+export async function buscarPorId(id) {
+  const { rows } = await pool.query(
+    `SELECT ${CAMPOS_PUBLICOS} FROM usuarios WHERE id = $1`,
+    [id],
+  );
+  return rows[0] ?? null;
+}

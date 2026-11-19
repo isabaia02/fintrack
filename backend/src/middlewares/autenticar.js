@@ -8,9 +8,16 @@ export function autenticar(req, res, next) {
   }
   try {
     const payload = jwt.verify(token, jwtConfig.secret);
-    req.usuarioId = Number(payload.sub);
+    const usuarioId = Number(payload.sub);
+    if (!Number.isInteger(usuarioId)) {
+      return res.status(401).json({ erro: 'Token inválido.' });
+    }
+    req.usuarioId = usuarioId;
     return next();
-  } catch {
-    return res.status(401).json({ erro: 'Token inválido ou expirado.' });
+  } catch (erro) {
+    if (erro instanceof jwt.TokenExpiredError) {
+      return res.status(401).json({ erro: 'Sua sessão expirou. Entre novamente.', codigo: 'SESSAO_EXPIRADA' });
+    }
+    return res.status(401).json({ erro: 'Token inválido.' });
   }
 }
