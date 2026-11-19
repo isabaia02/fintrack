@@ -1,8 +1,16 @@
-import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useFormulario } from '../hooks/useFormulario';
 import { mascararCpf } from '../utils/formatadores';
-import { apenasDigitos, emailValido, senhaValida } from '../utils/validacoes';
+import {
+  LIMITE_NOME,
+  LIMITE_SENHA_BYTES,
+  apenasDigitos,
+  cpfValido,
+  emailValido,
+  senhaCabeNoLimite,
+  senhaValida,
+} from '../utils/validacoes';
 import CartaoAuth from './layout/CartaoAuth';
 import { Aviso } from './ui/aviso';
 import { Button } from './ui/button';
@@ -15,12 +23,14 @@ const MENSAGEM_PADRAO = 'Não foi possível criar a conta. Tente novamente.';
 function validar({ nome, email, cpf, senha, confirmarSenha }) {
   const erros = {};
   if (!nome.trim()) erros.nome = 'Informe o nome.';
+  else if (nome.trim().length > LIMITE_NOME) erros.nome = `O nome deve ter no máximo ${LIMITE_NOME} caracteres.`;
   if (!email.trim()) erros.email = 'Informe o e-mail.';
   else if (!emailValido(email)) erros.email = 'Informe um e-mail válido.';
   if (!cpf) erros.cpf = 'Informe o CPF.';
-  else if (apenasDigitos(cpf).length !== 11) erros.cpf = 'Informe um CPF válido.';
+  else if (!cpfValido(cpf)) erros.cpf = 'Informe um CPF válido.';
   if (!senha) erros.senha = 'Informe a senha.';
   else if (!senhaValida(senha)) erros.senha = 'A senha deve ter no mínimo 8 caracteres, com letras e números.';
+  else if (!senhaCabeNoLimite(senha)) erros.senha = `A senha deve ter no máximo ${LIMITE_SENHA_BYTES} caracteres.`;
   if (confirmarSenha !== senha) erros.confirmarSenha = 'As senhas não conferem.';
   return erros;
 }
@@ -28,42 +38,23 @@ function validar({ nome, email, cpf, senha, confirmarSenha }) {
 export default function Cadastro() {
   const { token, carregando, cadastrar } = useAuth();
   const navigate = useNavigate();
-  const [valores, setValores] = useState({ nome: '', email: '', cpf: '', senha: '', confirmarSenha: '' });
-  const [erros, setErros] = useState({});
-  const [erroServidor, setErroServidor] = useState('');
-  const [enviando, setEnviando] = useState(false);
+  const { valores, erros, erroServidor, enviando, alterar, enviar } = useFormulario({
+    valoresIniciais: { nome: '', email: '', cpf: '', senha: '', confirmarSenha: '' },
+    validar,
+    aoEnviar: async ({ nome, email, cpf, senha }) => {
+      await cadastrar({
+        nome: nome.trim(),
+        email: email.trim(),
+        cpf: apenasDigitos(cpf),
+        senha,
+      });
+      navigate('/login', { state: { contaCriada: true } });
+    },
+    mensagemPadrao: MENSAGEM_PADRAO,
+  });
 
   if (carregando) return null;
   if (token) return <Navigate to="/" replace />;
-
-  const alterar = (campo, formatar = (texto) => texto) => (evento) => {
-    setValores((atual) => ({ ...atual, [campo]: formatar(evento.target.value) }));
-    setErros((atual) => ({ ...atual, [campo]: undefined }));
-  };
-
-  const enviar = async (evento) => {
-    evento.preventDefault();
-    const encontrados = validar(valores);
-    setErros(encontrados);
-    if (Object.keys(encontrados).length) return;
-
-    setEnviando(true);
-    setErroServidor('');
-    try {
-      await cadastrar({
-        nome: valores.nome.trim(),
-        email: valores.email.trim(),
-        cpf: apenasDigitos(valores.cpf),
-        senha: valores.senha,
-      });
-      navigate('/login', { state: { contaCriada: true } });
-    } catch (erro) {
-      const dados = erro.response?.data;
-      if (dados?.campos) setErros(dados.campos);
-      else setErroServidor(dados?.erro ?? MENSAGEM_PADRAO);
-      setEnviando(false);
-    }
-  };
 
   return (
     <CartaoAuth

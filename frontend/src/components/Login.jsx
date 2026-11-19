@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Link, Navigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useFormulario } from '../hooks/useFormulario';
 import { emailValido } from '../utils/validacoes';
 import CartaoAuth from './layout/CartaoAuth';
 import { Aviso } from './ui/aviso';
@@ -22,34 +23,21 @@ function validar({ email, senha }) {
 export default function Login() {
   const { token, carregando, sessaoExpirada, login } = useAuth();
   const { state } = useLocation();
-  const [valores, setValores] = useState({ email: '', senha: '' });
-  const [erros, setErros] = useState({});
-  const [erroServidor, setErroServidor] = useState('');
-  const [enviando, setEnviando] = useState(false);
+  const navigate = useNavigate();
+  const [contaCriada] = useState(Boolean(state?.contaCriada));
+  const { valores, erros, erroServidor, enviando, alterar, enviar } = useFormulario({
+    valoresIniciais: { email: '', senha: '' },
+    validar,
+    aoEnviar: ({ email, senha }) => login(email.trim(), senha),
+    mensagemPadrao: MENSAGEM_PADRAO,
+  });
+
+  useEffect(() => {
+    if (contaCriada) navigate('/login', { replace: true, state: null });
+  }, [contaCriada, navigate]);
 
   if (carregando) return null;
   if (token) return <Navigate to="/" replace />;
-
-  const alterar = (campo) => (evento) => {
-    setValores((atual) => ({ ...atual, [campo]: evento.target.value }));
-    setErros((atual) => ({ ...atual, [campo]: undefined }));
-  };
-
-  const enviar = async (evento) => {
-    evento.preventDefault();
-    const encontrados = validar(valores);
-    setErros(encontrados);
-    if (Object.keys(encontrados).length) return;
-
-    setEnviando(true);
-    setErroServidor('');
-    try {
-      await login(valores.email.trim(), valores.senha);
-    } catch (erro) {
-      setErroServidor(erro.response?.data?.erro ?? MENSAGEM_PADRAO);
-      setEnviando(false);
-    }
-  };
 
   return (
     <CartaoAuth
@@ -65,7 +53,7 @@ export default function Login() {
       <form onSubmit={enviar} noValidate className="flex flex-col gap-6">
         {erroServidor ? (
           <Aviso tom="erro">{erroServidor}</Aviso>
-        ) : state?.contaCriada ? (
+        ) : contaCriada ? (
           <Aviso tom="sucesso">Conta criada. Entre para começar.</Aviso>
         ) : sessaoExpirada ? (
           <Aviso tom="info">Sua sessão expirou. Entre novamente.</Aviso>

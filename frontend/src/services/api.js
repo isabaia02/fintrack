@@ -13,10 +13,12 @@ api.interceptors.request.use((config) => {
 let aoNaoAutorizado = () => {};
 export const definirAoNaoAutorizado = (fn) => { aoNaoAutorizado = fn; };
 
+const enviouToken = (erro) => Boolean(erro.config?.headers?.Authorization);
+
 api.interceptors.response.use(
   (res) => res,
   (erro) => {
-    if (erro.response?.status === 401) aoNaoAutorizado(erro);
+    if (erro.response?.status === 401 && enviouToken(erro)) aoNaoAutorizado(erro);
     return Promise.reject(erro);
   },
 );

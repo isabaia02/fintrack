@@ -23,12 +23,12 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (!token) { setCarregando(false); return; }
+    if (!token || usuario) { setCarregando(false); return; }
     api.get('/auth/me')
       .then((res) => setUsuario(res.data))
       .catch(() => {})
       .finally(() => setCarregando(false));
-  }, [token]);
+  }, [token, usuario]);
 
   const login = async (email, senha) => {
     const { data } = await api.post('/auth/login', { email, senha });
