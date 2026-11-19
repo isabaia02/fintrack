@@ -18,9 +18,12 @@ CREATE TABLE categorias (
   usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
   nome        VARCHAR(60) NOT NULL,
   tipo        VARCHAR(7)  NOT NULL CHECK (tipo IN ('entrada', 'saida')),
-  cor         SMALLINT    NOT NULL CHECK (cor BETWEEN 1 AND 9), 
-  UNIQUE (usuario_id, nome, tipo)
+  cor         SMALLINT    CHECK (cor BETWEEN 1 AND 8),  -- slot fixo da paleta (chart/1..8); NULL = "Outras" (cinza)
+  UNIQUE (usuario_id, cor)  -- NULLs não colidem: várias categorias "Outras"
 );
+
+-- Nome único por usuário e tipo, sem diferenciar maiúsculas/minúsculas.
+CREATE UNIQUE INDEX categorias_nome_unico ON categorias (usuario_id, LOWER(nome), tipo);
 
 CREATE TABLE fontes_destinos (
   id              SERIAL PRIMARY KEY,
