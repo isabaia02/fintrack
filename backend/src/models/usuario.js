@@ -5,6 +5,7 @@ const CAMPOS_PUBLICOS = 'id, nome, email';
 
 export async function criarComPadroes({ nome, email, cpf, senhaHash }) {
   const client = await pool.connect();
+  let descartarConexao = false;
   try {
     await client.query('BEGIN');
     const { rows: [usuario] } = await client.query(
@@ -27,10 +28,15 @@ export async function criarComPadroes({ nome, email, cpf, senhaHash }) {
     await client.query('COMMIT');
     return usuario;
   } catch (erro) {
-    await client.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } catch (erroRollback) {
+      console.error('Falha no ROLLBACK:', erroRollback);
+      descartarConexao = true;
+    }
     throw erro;
   } finally {
-    client.release();
+    client.release(descartarConexao);
   }
 }
 
