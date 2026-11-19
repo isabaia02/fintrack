@@ -7,8 +7,8 @@ DROP TABLE IF EXISTS usuarios CASCADE;
 CREATE TABLE usuarios (
   id          SERIAL PRIMARY KEY,
   nome        VARCHAR(120) NOT NULL,
-  email       VARCHAR(160) NOT NULL UNIQUE,    
-  cpf         CHAR(11)     NOT NULL UNIQUE,     
+  email       VARCHAR(160) NOT NULL UNIQUE,
+  cpf         CHAR(11)     NOT NULL UNIQUE,
   senha_hash  VARCHAR(100) NOT NULL,
   criado_em   TIMESTAMP    NOT NULL DEFAULT NOW()
 );
@@ -18,6 +18,7 @@ CREATE TABLE categorias (
   usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
   nome        VARCHAR(60) NOT NULL,
   tipo        VARCHAR(7)  NOT NULL CHECK (tipo IN ('entrada', 'saida')),
+  cor         SMALLINT    NOT NULL CHECK (cor BETWEEN 1 AND 9), 
   UNIQUE (usuario_id, nome, tipo)
 );
 
@@ -29,7 +30,7 @@ CREATE TABLE fontes_destinos (
   dia_fechamento  SMALLINT CHECK (dia_fechamento BETWEEN 1 AND 31),
   dia_vencimento  SMALLINT CHECK (dia_vencimento BETWEEN 1 AND 31),
   limite          NUMERIC(12, 2),
-  reserva         BOOLEAN NOT NULL DEFAULT FALSE,  
+  reserva         BOOLEAN NOT NULL DEFAULT FALSE,
   UNIQUE (usuario_id, nome),
   CHECK (tipo <> 'cartao_credito'
          OR (dia_fechamento IS NOT NULL AND dia_vencimento IS NOT NULL AND limite IS NOT NULL))
@@ -46,7 +47,7 @@ CREATE TABLE lancamentos (
   fonte_destino_id    INTEGER NOT NULL REFERENCES fontes_destinos(id),
   parcela_atual       SMALLINT NOT NULL DEFAULT 1,
   total_parcelas      SMALLINT NOT NULL DEFAULT 1 CHECK (total_parcelas BETWEEN 1 AND 48),
-  grupo_parcelamento  UUID,                    
+  grupo_parcelamento  UUID,
   criado_em           TIMESTAMP NOT NULL DEFAULT NOW(),
   CHECK (parcela_atual BETWEEN 1 AND total_parcelas)
 );
