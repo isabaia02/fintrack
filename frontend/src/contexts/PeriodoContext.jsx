@@ -1,13 +1,14 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { rotuloMes } from '../utils/formatadores';
-
-const PeriodoContext = createContext(null);
+import { PeriodoContext } from './periodo';
 
 const iso = (ano, mes, dia) => new Date(Date.UTC(ano, mes, dia)).toISOString().slice(0, 10);
 
 export function PeriodoProvider({ children }) {
-  const hoje = new Date();
-  const [{ ano, mes }, setMes] = useState({ ano: hoje.getFullYear(), mes: hoje.getMonth() });
+  const [{ ano, mes }, setMes] = useState(() => {
+    const hoje = new Date();
+    return { ano: hoje.getFullYear(), mes: hoje.getMonth() };
+  });
 
   const valor = useMemo(() => {
     const deslocar = (delta) => setMes(({ ano: a, mes: m }) => {
@@ -26,10 +27,4 @@ export function PeriodoProvider({ children }) {
   }, [ano, mes]);
 
   return <PeriodoContext.Provider value={valor}>{children}</PeriodoContext.Provider>;
-}
-
-export function usePeriodo() {
-  const ctx = useContext(PeriodoContext);
-  if (!ctx) throw new Error('usePeriodo deve ser usado dentro de PeriodoProvider');
-  return ctx;
 }
