@@ -1,9 +1,15 @@
 import { rateLimit } from 'express-rate-limit';
 
-// Só tentativas com falha contam; um login válido não consome o limite.
+const LIMITE_PADRAO = 10;
+
+export function lerLimite(valor) {
+  const numero = Number.parseInt(valor, 10);
+  return Number.isInteger(numero) && numero > 0 ? numero : LIMITE_PADRAO;
+}
+
 export const limitarLogin = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: Number(process.env.LOGIN_RATE_LIMIT_MAX ?? 10),
+  limit: lerLimite(process.env.LOGIN_RATE_LIMIT_MAX),
   skipSuccessfulRequests: true,
   standardHeaders: 'draft-7',
   legacyHeaders: false,

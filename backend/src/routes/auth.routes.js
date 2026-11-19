@@ -1,17 +1,17 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { jwtConfig } from '../config/jwt.js';
+import { ALGORITMO_JWT, jwtConfig } from '../config/jwt.js';
+import { CUSTO_BCRYPT } from '../config/senha.js';
 import { autenticar } from '../middlewares/autenticar.js';
 import { limitarLogin } from '../middlewares/limitarLogin.js';
 import { validarCadastro } from '../middlewares/validarCadastro.js';
+import { validarLogin } from '../middlewares/validarLogin.js';
 import { criarComPadroes, campoDuplicado, buscarPorEmail, buscarPorId } from '../models/usuario.js';
 
 const router = Router();
 
-// Hash descartável: a senha é comparada mesmo quando o e-mail não existe,
-// para o tempo de resposta não revelar se o e-mail está cadastrado.
-const HASH_FALSO = bcrypt.hashSync('senha-inexistente', 10);
+const HASH_FALSO = await bcrypt.hash('senha-inexistente', CUSTO_BCRYPT);
 
 const MENSAGENS_DUPLICADO = {
   email: 'Já existe um usuário com este e-mail.',
@@ -21,7 +21,7 @@ const MENSAGENS_DUPLICADO = {
 router.post('/cadastro', validarCadastro, async (req, res, next) => {
   const { nome, email, cpf, senha } = req.dadosCadastro;
   try {
-    const senhaHash = await bcrypt.hash(senha, 10);
+    const senhaHash = await bcrypt.hash(senha, CUSTO_BCRYPT);
     const usuario = await criarComPadroes({ nome, email, cpf, senhaHash });
     return res.status(201).json(usuario);
   } catch (erro) {
@@ -36,17 +36,8 @@ router.post('/cadastro', validarCadastro, async (req, res, next) => {
   }
 });
 
-router.post('/login', limitarLogin, async (req, res, next) => {
-  const corpo = req.body ?? {};
-  const email = typeof corpo.email === 'string' ? corpo.email.trim().toLowerCase() : '';
-  const senha = typeof corpo.senha === 'string' ? corpo.senha : '';
-
-  const campos = {};
-  if (!email) campos.email = 'Informe o e-mail.';
-  if (!senha) campos.senha = 'Informe a senha.';
-  if (Object.keys(campos).length) {
-    return res.status(400).json({ erro: 'Dados inválidos.', campos });
-  }
+router.post('/login', validarLogin, limitarLogin, async (req, res, next) => {
+  const { email, senha } = req.dadosLogin;
 
   try {
     const registro = await buscarPorEmail(email);
@@ -57,6 +48,7 @@ router.post('/login', limitarLogin, async (req, res, next) => {
 
     const { senha_hash: _senhaHash, ...usuario } = registro;
     const token = jwt.sign({}, jwtConfig.secret, {
+      algorithm: ALGORITMO_JWT,
       subject: String(usuario.id),
       expiresIn: jwtConfig.expiresIn,
     });
@@ -69,7 +61,9 @@ router.post('/login', limitarLogin, async (req, res, next) => {
 router.get('/me', autenticar, async (req, res, next) => {
   try {
     const usuario = await buscarPorId(req.usuarioId);
-    if (!usuario) return res.status(401).json({ erro: 'Token inválido.' });
+    if (!usuario) {
+      return res.status(401).json({ erro: 'Usuário não encontrado.', codigo: 'USUARIO_INEXISTENTE' });
+    }
     return res.json(usuario);
   } catch (erro) {
     return next(erro);
