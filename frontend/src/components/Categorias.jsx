@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import Icone from './Icone';
-import { Button } from './ui/button';
+import { Carregando } from './ui/carregando';
+import { MensagemErro } from './ui/mensagem-erro';
 import { PainelCategorias } from './categorias/PainelCategorias';
 import {
   DialogoCategoria,
@@ -10,34 +11,47 @@ import {
 } from './categorias/DialogoCategoria';
 
 export default function Categorias() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [categorias, setCategorias] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
-  const [formulario, setFormulario] = useState(null);
+  const [editando, setEditando] = useState(null);
   const [paraExcluir, setParaExcluir] = useState(null);
   const [erroExclusao, setErroExclusao] = useState('');
   const [excluindo, setExcluindo] = useState(false);
   const [bloqueio, setBloqueio] = useState('');
 
-  const carregar = useCallback(async () => {
-    setErro('');
-    try {
-      const { data } = await api.get('/categorias');
-      setCategorias(data);
-    } catch (e) {
-      setErro(e.response?.data?.erro ?? 'Não foi possível carregar as categorias.');
-    } finally {
-      setCarregando(false);
-    }
-  }, []);
+  const criando = searchParams.get('novo') === '1';
+  const formulario = editando ? { categoria: editando } : criando ? { categoria: null } : null;
+
+  const [versao, setVersao] = useState(0);
+  const recarregar = () => setVersao((v) => v + 1);
 
   useEffect(() => {
-    carregar();
-  }, [carregar]);
+    let ativo = true;
+    api.get('/categorias')
+      .then(({ data }) => {
+        if (!ativo) return;
+        setCategorias(data);
+        setErro('');
+      })
+      .catch((e) => {
+        if (ativo) setErro(e.response?.data?.erro ?? 'Não foi possível carregar as categorias.');
+      })
+      .finally(() => {
+        if (ativo) setCarregando(false);
+      });
+    return () => { ativo = false; };
+  }, [versao]);
 
-  const recarregarDepoisDeSalvar = async () => {
-    setFormulario(null);
-    await carregar();
+  const fecharFormulario = () => {
+    setEditando(null);
+    if (criando) setSearchParams({}, { replace: true });
+  };
+
+  const aoSalvar = () => {
+    fecharFormulario();
+    recarregar();
   };
 
   async function confirmarExclusao() {
@@ -46,7 +60,7 @@ export default function Categorias() {
     try {
       await api.delete(`/categorias/${paraExcluir.id}`);
       setParaExcluir(null);
-      await carregar();
+      recarregar();
     } catch (e) {
       const { status, data } = e.response ?? {};
       if (status === 409) {
@@ -54,7 +68,7 @@ export default function Categorias() {
         setBloqueio(data.erro);
       } else if (status === 404) {
         setParaExcluir(null);
-        await carregar();
+        recarregar();
       } else {
         setErroExclusao(data?.erro ?? 'Não foi possível excluir. Tente novamente.');
       }
@@ -63,30 +77,23 @@ export default function Categorias() {
     }
   }
 
+  const pedirExclusao = (categoria) => {
+    setErroExclusao('');
+    setParaExcluir(categoria);
+  };
+
   const saidas = categorias.filter((c) => c.tipo === 'saida');
   const entradas = categorias.filter((c) => c.tipo === 'entrada');
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1>Categorias</h1>
-        <Button onClick={() => setFormulario({ categoria: null })}>
-          <Icone nome="add" tamanho={18} />
-          Nova categoria
-        </Button>
-      </div>
-
-      {carregando && (
-        <p role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-text-muted">
-          <Icone nome="autorenew" girando /> Carregando categorias...
-        </p>
-      )}
+    <>
+      {carregando && <Carregando linhas={5} />}
 
       {!carregando && erro && (
-        <div role="alert" className="flex flex-col items-center gap-3 rounded-md border border-border bg-surface py-12 text-center">
-          <p className="text-sm text-danger">{erro}</p>
-          <Button variante="secondary" onClick={() => { setCarregando(true); carregar(); }}>Tentar novamente</Button>
-        </div>
+        <MensagemErro
+          mensagem={erro}
+          onTentarDeNovo={() => { setCarregando(true); recarregar(); }}
+        />
       )}
 
       {!carregando && !erro && (
@@ -95,15 +102,15 @@ export default function Categorias() {
             titulo="Saídas"
             categorias={saidas}
             mensagemVazia="Nenhuma categoria de saída. Crie a primeira em “Nova categoria”."
-            aoEditar={(categoria) => setFormulario({ categoria })}
-            aoExcluir={(categoria) => { setErroExclusao(''); setParaExcluir(categoria); }}
+            aoEditar={setEditando}
+            aoExcluir={pedirExclusao}
           />
           <PainelCategorias
             titulo="Entradas"
             categorias={entradas}
             mensagemVazia="Nenhuma categoria de entrada. Crie a primeira em “Nova categoria”."
-            aoEditar={(categoria) => setFormulario({ categoria })}
-            aoExcluir={(categoria) => { setErroExclusao(''); setParaExcluir(categoria); }}
+            aoEditar={setEditando}
+            aoExcluir={pedirExclusao}
           />
         </div>
       )}
@@ -111,8 +118,8 @@ export default function Categorias() {
       <DialogoCategoria
         aberto={Boolean(formulario)}
         categoria={formulario?.categoria}
-        aoCancelar={() => setFormulario(null)}
-        aoSalvar={recarregarDepoisDeSalvar}
+        aoCancelar={fecharFormulario}
+        aoSalvar={aoSalvar}
       />
       <DialogoConfirmarExclusao
         categoria={paraExcluir}
@@ -122,6 +129,6 @@ export default function Categorias() {
         erro={erroExclusao}
       />
       <DialogoExclusaoBloqueada mensagem={bloqueio} aoFechar={() => setBloqueio('')} />
-    </div>
+    </>
   );
 }

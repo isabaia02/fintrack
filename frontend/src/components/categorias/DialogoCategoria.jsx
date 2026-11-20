@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import api from '../../services/api';
 import { Button } from '../ui/button';
+import { Campo } from '../ui/campo';
 import { Dialogo } from '../ui/dialogo';
 import { Input } from '../ui/input';
 import { Segmentado } from '../ui/segmentado';
@@ -56,30 +57,24 @@ function Formulario({ categoria, aoCancelar, aoSalvar }) {
         )}
       >
         <div className="mt-2 flex flex-col gap-4">
-          <label className="flex flex-col gap-1.5 text-sm font-medium">
-            Nome
+          <Campo label="Nome" erro={erros.nome}>
             <Input
               value={nome}
               onChange={(e) => setNome(e.target.value)}
               maxLength={60}
               autoFocus
-              aria-invalid={Boolean(erros.nome)}
-              aria-describedby={erros.nome ? 'erro-nome' : undefined}
               placeholder="Ex.: Mercado"
             />
-            {erros.nome && <span id="erro-nome" className="text-xs font-normal text-danger">{erros.nome}</span>}
-          </label>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Tipo</span>
-            {tipoTravado ? (
+          </Campo>
+          <Campo label="Tipo" erro={erros.tipo}>
+            {({ 'aria-describedby': descricaoId }) => (tipoTravado ? (
               <p className="text-sm text-text-muted">
                 {TIPOS.find((t) => t.valor === tipo).rotulo} — o tipo não pode mudar enquanto houver lançamentos.
               </p>
             ) : (
-              <Segmentado rotulo="Tipo" opcoes={TIPOS} valor={tipo} onChange={setTipo} />
-            )}
-            {erros.tipo && <span className="text-xs text-danger">{erros.tipo}</span>}
-          </div>
+              <Segmentado rotulo="Tipo" opcoes={TIPOS} valor={tipo} onChange={setTipo} aria-describedby={descricaoId} />
+            ))}
+          </Campo>
           {erroGeral && <p role="alert" className="text-sm text-danger">{erroGeral}</p>}
         </div>
       </Dialogo>
