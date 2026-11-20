@@ -3,6 +3,7 @@ import { pool } from '../config/db.js';
 import authRoutes from './auth.routes.js';
 import categoriasRoutes from './categorias.routes.js';
 import fontesDestinosRoutes from './fontesDestinos.routes.js';
+import lancamentosRoutes from './lancamentos.routes.js';
 
 const router = Router();
 
@@ -18,5 +19,6 @@ router.get('/health', async (req, res, next) => {
 router.use('/auth', authRoutes);
 router.use('/categorias', categoriasRoutes);
 router.use('/fontes-destinos', fontesDestinosRoutes);
+router.use('/lancamentos', lancamentosRoutes);
 
 export default router;
