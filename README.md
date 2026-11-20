@@ -15,7 +15,7 @@ backend/
     server.js
     routes/        rotas + controladores
     models/        acesso ao banco e regras (cpf.js, faturas.js)
-    middlewares/   autenticar.js (JWT), erros.js
+    middlewares/   autenticar.js (JWT), limitarLogin.js, validarCadastro.js, erros.js
     config/        db.js (pool), jwt.js
 frontend/src/
   components/  páginas e componentes
@@ -46,4 +46,4 @@ Utilitários puros (`cpfValido`, `calcularFatura`) ficam em `backend/src/models/
 Usuários do seed: `ana@email.com` e `bruno@email.com` (senha `senha1234`).
 
 ## Rotas
-Implementadas até agora: `GET /api/health`. As demais (auth, categorias, fontes-destinos, lançamentos, relatórios) seguem a tabela 10.5 do enunciado e serão adicionadas.
+Implementadas até agora: `GET /api/health`, `POST /api/auth/cadastro`, `POST /api/auth/login` (limite de tentativas; ajustável por `LOGIN_RATE_LIMIT_MAX`) e `GET /api/auth/me` (requer `Authorization: Bearer <token>`). As demais (categorias, fontes-destinos, lançamentos, relatórios) seguem a tabela 10.5 do enunciado e serão adicionadas.
