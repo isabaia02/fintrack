@@ -174,20 +174,23 @@ describe('fontes e destinos (integração com Postgres)', { skip: pular }, () =>
     assert.equal((await chamar(u, 'GET', '?tipo=x')).status, 400);
   });
 
-  test('nome duplicado devolve 409 mesmo com caixa diferente ou tipo diferente', async () => {
+  test('nome duplicado no mesmo tipo devolve 409 (mesmo com caixa diferente); tipos diferentes podem repetir', async () => {
     const u = await novoUsuario();
     const outro = await novoUsuario();
     await chamar(u, 'POST', '', { nome: 'Nubank', tipo: 'conta' });
 
-    const igual = await chamar(u, 'POST', '', cartao('  nubank '));
+    const igual = await chamar(u, 'POST', '', { nome: '  nubank ', tipo: 'conta' });
     assert.equal(igual.status, 409);
-    assert.ok(igual.corpo.campos.nome);
+    assert.equal(igual.corpo.campos.nome, 'Já existe uma fonte ou destino com este nome neste tipo.');
 
+    assert.equal((await chamar(u, 'POST', '', cartao('Nubank'))).status, 201, 'cartão pode ter o nome de uma conta');
+    assert.equal((await chamar(u, 'POST', '', cartao('NUBANK'))).status, 409, 'mas não de outro cartão');
     assert.equal((await chamar(outro, 'POST', '', cartao('Nubank'))).status, 201, 'outro usuário pode repetir');
 
-    const { corpo: extra } = await chamar(u, 'POST', '', { nome: 'Extra', tipo: 'renda' });
-    assert.equal((await chamar(u, 'PUT', `/${extra.id}`, { nome: 'NUBANK', tipo: 'renda' })).status, 409);
-    assert.equal((await chamar(u, 'PUT', `/${extra.id}`, { nome: 'extra', tipo: 'renda' })).status, 200, 'manter o próprio nome');
+    const { corpo: extra } = await chamar(u, 'POST', '', { nome: 'Extra', tipo: 'conta' });
+    assert.equal((await chamar(u, 'PUT', `/${extra.id}`, { nome: 'NUBANK', tipo: 'conta' })).status, 409);
+    assert.equal((await chamar(u, 'PUT', `/${extra.id}`, { nome: 'extra', tipo: 'conta' })).status, 200, 'manter o próprio nome');
+    assert.equal((await chamar(u, 'PUT', `/${extra.id}`, cartao('Nubank'))).status, 409, 'mudar de tipo também respeita o nome');
   });
 
   test('PUT atualiza o item; cartão incompleto devolve 400; virar conta limpa os campos de cartão', async () => {
@@ -223,6 +226,29 @@ describe('fontes e destinos (integração com Postgres)', { skip: pular }, () =>
     const renomeado = await chamar(u, 'PUT', `/${conta.id}`, { nome: 'Conta principal', tipo: 'conta', reserva: true });
     assert.equal(renomeado.status, 200);
     assert.equal(renomeado.corpo.total_lancamentos, 2);
+  });
+
+  test('fechamento e vencimento ficam travados com lançamentos; nome e limite continuam editáveis', async () => {
+    const u = await novoUsuario();
+    const { corpo: item } = await chamar(u, 'POST', '', cartao('Nubank'));
+    await categoriaELancamentos(u, item.id, 2);
+
+    const fechamento = await chamar(u, 'PUT', `/${item.id}`, cartao('Nubank', { dia_fechamento: 10 }));
+    assert.equal(fechamento.status, 409);
+    assert.deepEqual(Object.keys(fechamento.corpo.campos), ['dia_fechamento']);
+
+    const vencimento = await chamar(u, 'PUT', `/${item.id}`, cartao('Nubank', { dia_vencimento: 15 }));
+    assert.equal(vencimento.status, 409);
+    assert.deepEqual(Object.keys(vencimento.corpo.campos), ['dia_vencimento']);
+
+    const ambos = await chamar(u, 'PUT', `/${item.id}`, cartao('Nubank', { dia_fechamento: 10, dia_vencimento: 15 }));
+    assert.deepEqual(Object.keys(ambos.corpo.campos).sort(), ['dia_fechamento', 'dia_vencimento']);
+
+    const editado = await chamar(u, 'PUT', `/${item.id}`, cartao('Nubank Ultravioleta', { limite: 9000 }));
+    assert.equal(editado.status, 200);
+    assert.equal(editado.corpo.limite, 9000);
+    assert.equal(editado.corpo.dia_fechamento, 3);
+    assert.equal(editado.corpo.dia_vencimento, 10);
   });
 
   test('excluir item com lançamentos devolve 409 com a quantidade e não apaga', async () => {

@@ -1,7 +1,4 @@
 import { emTransacao, pool } from '../config/db.js';
-import { idValido } from '../utils/id.js';
-
-export { idValido };
 
 const SELECT_COM_TOTAL = `
   SELECT f.id, f.nome, f.tipo, f.dia_fechamento, f.dia_vencimento,
@@ -53,14 +50,20 @@ export async function criar(usuarioId, dados) {
 export function atualizar(usuarioId, id, dados) {
   return emTransacao(async (client) => {
     const { rows: [atual] } = await client.query(
-      'SELECT id, tipo FROM fontes_destinos WHERE id = $1 AND usuario_id = $2 FOR UPDATE',
+      'SELECT id, tipo, dia_fechamento, dia_vencimento FROM fontes_destinos WHERE id = $1 AND usuario_id = $2 FOR UPDATE',
       [id, usuarioId],
     );
     if (!atual) return { naoEncontrada: true };
 
-    if (dados.tipo !== atual.tipo) {
+    // As faturas são calculadas a partir da data da compra e dos dias atuais do cartão:
+    // mudar tipo, fechamento ou vencimento reclassificaria os lançamentos antigos.
+    const diasMudados = ['dia_fechamento', 'dia_vencimento'].filter((campo) => dados[campo] !== atual[campo]);
+    if (dados.tipo !== atual.tipo || diasMudados.length) {
       const total = await contarLancamentos(client, usuarioId, id);
-      if (total > 0) return { tipoBloqueado: total };
+      if (total > 0) {
+        if (dados.tipo !== atual.tipo) return { tipoBloqueado: total };
+        return { diasBloqueados: { total, campos: diasMudados } };
+      }
     }
 
     await client.query(

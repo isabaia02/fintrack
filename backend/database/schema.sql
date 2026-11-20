@@ -38,8 +38,9 @@ CREATE TABLE fontes_destinos (
          OR (dia_fechamento IS NOT NULL AND dia_vencimento IS NOT NULL AND limite IS NOT NULL))
 );
 
--- Nome único por usuário, sem diferenciar maiúsculas/minúsculas.
-CREATE UNIQUE INDEX fontes_destinos_nome_unico ON fontes_destinos (usuario_id, LOWER(nome));
+-- Nome único por usuário e tipo, sem diferenciar maiúsculas/minúsculas
+-- (uma conta e um cartão podem se chamar "Nubank").
+CREATE UNIQUE INDEX fontes_destinos_nome_unico ON fontes_destinos (usuario_id, LOWER(nome), tipo);
 
 CREATE TABLE lancamentos (
   id                  SERIAL PRIMARY KEY,
