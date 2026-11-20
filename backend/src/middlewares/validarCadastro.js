@@ -1,12 +1,12 @@
 import { cpfValido } from '../models/cpf.js';
+import { normalizarEmail, texto } from '../utils/texto.js';
 
 const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export function validarCadastro(req, res, next) {
   const corpo = req.body ?? {};
-  const texto = (v) => (typeof v === 'string' ? v : '');
   const nome = texto(corpo.nome).trim();
-  const email = texto(corpo.email).trim().toLowerCase();
+  const email = normalizarEmail(corpo.email);
   const cpf = texto(corpo.cpf).replace(/\D/g, '');
   const senha = texto(corpo.senha);
   const campos = {};
