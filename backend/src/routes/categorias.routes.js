@@ -6,6 +6,7 @@ import {
   validarTipoFiltro,
 } from '../middlewares/validarCategoria.js';
 import * as Categoria from '../models/categoria.js';
+import { idValido } from '../utils/id.js';
 
 const router = Router();
 router.use(autenticar);
@@ -38,7 +39,7 @@ router.post('/', validarCriacaoCategoria, async (req, res, next) => {
 });
 
 router.put('/:id', validarEdicaoCategoria, async (req, res, next) => {
-  const id = Categoria.idValido(req.params.id);
+  const id = idValido(req.params.id);
   if (!id) return res.status(404).json(NAO_ENCONTRADA);
   try {
     const resultado = await Categoria.atualizar(req.usuarioId, id, req.dadosCategoria);
@@ -57,7 +58,7 @@ router.put('/:id', validarEdicaoCategoria, async (req, res, next) => {
 });
 
 router.delete('/:id', async (req, res, next) => {
-  const id = Categoria.idValido(req.params.id);
+  const id = idValido(req.params.id);
   if (!id) return res.status(404).json(NAO_ENCONTRADA);
   try {
     const resultado = await Categoria.excluir(req.usuarioId, id);
