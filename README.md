@@ -45,8 +45,19 @@ Utilitários puros (`cpfValido`, `calcularFatura`) ficam em `backend/src/models/
 
 Usuários do seed: `ana@email.com` e `bruno@email.com` (senha `senha1234`).
 
+### Testes do back-end
+```bash
+cd backend
+npm test                                  # testes unitários (sem banco)
+
+# + testes de integração (categorias): precisam de um banco de teste exclusivo,
+# cujo schema é recriado a cada execução (o nome do banco deve conter "test")
+createdb fintrack_test
+TEST_DATABASE_URL=postgresql://localhost:5432/fintrack_test npm test
+```
+
 ## Rotas
-Implementadas até agora: `GET /api/health`, `POST /api/auth/cadastro`, `POST /api/auth/login` (limite de tentativas; ajustável por `LOGIN_RATE_LIMIT_MAX`) e `GET /api/auth/me` (requer `Authorization: Bearer <token>`). As demais (categorias, fontes-destinos, lançamentos, relatórios) seguem a tabela 10.5 do enunciado e serão adicionadas.
+Implementadas até agora: `GET /api/health`, `POST /api/auth/cadastro`, `POST /api/auth/login` (limite de tentativas; ajustável por `LOGIN_RATE_LIMIT_MAX`) e `GET /api/auth/me` (requer `Authorization: Bearer <token>`), além do CRUD de `/api/categorias` (`GET`/`POST` e `PUT`/`DELETE` em `/:id`, todos autenticados). As demais (fontes-destinos, lançamentos, relatórios) seguem a tabela 10.5 do enunciado e serão adicionadas.
 
 ## Design system (front-end)
 - Tokens do Figma em `frontend/src/index.css`, com modo claro e escuro (`[data-theme="dark"]`). Use as classes do Tailwind (`bg-surface`, `text-text-muted`, `border-border-strong`...), sem cores soltas.

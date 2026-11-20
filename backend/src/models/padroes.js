@@ -7,7 +7,7 @@ export const categoriasPadrao = [
   { nome: 'Outros', tipo: 'saida', cor: 6 },
   { nome: 'Educação', tipo: 'saida', cor: 8 },
   { nome: 'Salário', tipo: 'entrada', cor: 7 },
-  { nome: 'Freelance', tipo: 'entrada', cor: 9 },
+  { nome: 'Freelance', tipo: 'entrada', cor: null },
 ];
 
 export const fontesDestinosPadrao = [
