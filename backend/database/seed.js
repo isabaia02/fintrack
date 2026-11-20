@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcrypt';
 import pg from 'pg';
+import { CUSTO_BCRYPT } from '../src/config/senha.js';
 import { categoriasPadrao } from '../src/models/padroes.js';
 
 const SENHA = 'senha1234'; // senha dos usuários de demonstração
@@ -33,7 +34,7 @@ await client.connect();
 
 try {
   await client.query('BEGIN');
-  const hash = await bcrypt.hash(SENHA, 10);
+  const hash = await bcrypt.hash(SENHA, CUSTO_BCRYPT);
   const hoje = new Date();
 
   for (const u of usuarios) {
