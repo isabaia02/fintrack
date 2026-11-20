@@ -64,7 +64,7 @@ router.delete('/:id', async (req, res, next) => {
     if (resultado.naoEncontrada) return res.status(404).json(NAO_ENCONTRADA);
     if (resultado.bloqueadaPor) {
       return res.status(409).json({
-        erro: `Esta categoria tem ${resultado.bloqueadaPor} lançamentos. Mova-os para outra categoria antes de excluir.`,
+        erro: `Esta categoria tem ${plural(resultado.bloqueadaPor)}. Mova-${resultado.bloqueadaPor === 1 ? 'o' : 'os'} para outra categoria antes de excluir.`,
       });
     }
     return res.status(204).end();

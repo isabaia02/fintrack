@@ -1,13 +1,10 @@
-import { pool } from '../config/db.js';
+import { emTransacao, pool } from '../config/db.js';
 import { categoriasPadrao, fontesDestinosPadrao } from './padroes.js';
 
 const CAMPOS_PUBLICOS = 'id, nome, email';
 
-export async function criarComPadroes({ nome, email, cpf, senhaHash }) {
-  const client = await pool.connect();
-  let descartarConexao = false;
-  try {
-    await client.query('BEGIN');
+export function criarComPadroes({ nome, email, cpf, senhaHash }) {
+  return emTransacao(async (client) => {
     const { rows: [usuario] } = await client.query(
       `INSERT INTO usuarios (nome, email, cpf, senha_hash) VALUES ($1, $2, $3, $4)
        RETURNING ${CAMPOS_PUBLICOS}`,
@@ -25,19 +22,8 @@ export async function criarComPadroes({ nome, email, cpf, senhaHash }) {
         [usuario.id, f.nome, f.tipo],
       );
     }
-    await client.query('COMMIT');
     return usuario;
-  } catch (erro) {
-    try {
-      await client.query('ROLLBACK');
-    } catch (erroRollback) {
-      console.error('Falha no ROLLBACK:', erroRollback);
-      descartarConexao = true;
-    }
-    throw erro;
-  } finally {
-    client.release(descartarConexao);
-  }
+  });
 }
 
 export function campoDuplicado(erro) {

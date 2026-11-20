@@ -1,4 +1,4 @@
-import { pool } from '../config/db.js';
+import { emTransacao, pool } from '../config/db.js';
 
 const TOTAL_SLOTS = 8;
 const ID_MAX = 2147483647; 
@@ -42,27 +42,6 @@ function proximoSlot(usadas) {
     if (!usadas.has(slot)) return slot;
   }
   return null;
-}
-
-async function emTransacao(fn) {
-  const client = await pool.connect();
-  let descartarConexao = false;
-  try {
-    await client.query('BEGIN');
-    const resultado = await fn(client);
-    await client.query('COMMIT');
-    return resultado;
-  } catch (erro) {
-    try {
-      await client.query('ROLLBACK');
-    } catch (erroRollback) {
-      console.error('Falha no ROLLBACK:', erroRollback);
-      descartarConexao = true;
-    }
-    throw erro;
-  } finally {
-    client.release(descartarConexao);
-  }
 }
 
 export function criar(usuarioId, { nome, tipo }) {
