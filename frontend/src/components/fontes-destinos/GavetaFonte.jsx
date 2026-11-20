@@ -8,7 +8,9 @@ import { Input } from '../ui/input';
 import { Segmentado } from '../ui/segmentado';
 import { TIPOS } from './rotulos';
 
-const apenasDigitos = (texto) => texto.replace(/\D/g, '').slice(0, 2);
+// NUMERIC(12, 2): no máximo 12 dígitos (9.999.999.999,99), o mesmo teto da API.
+const DIGITOS_LIMITE = 12;
+const apenasDigitos =(texto) => texto.replace(/\D/g, '').slice(0, 2);
 const diaValido = (texto) => texto !== '' && Number(texto) >= 1 && Number(texto) <= 31;
 const centavos = (valor) => mascararValor(String(Math.round(valor * 100)));
 
@@ -69,6 +71,7 @@ function Formulario({ item, aoCancelar, aoSalvar }) {
     <Gaveta
       aberto
       aoFechar={aoCancelar}
+      bloqueada={salvando}
       aoEnviar={enviar}
       titulo={editando ? 'Editar fonte ou destino' : 'Nova fonte ou destino'}
       rodape={(
@@ -79,11 +82,10 @@ function Formulario({ item, aoCancelar, aoSalvar }) {
       )}
     >
       <Campo
-        label={<span className="sr-only">Tipo</span>}
         ajuda={tipoTravado ? 'O tipo não pode mudar enquanto houver lançamentos.' : undefined}
         erro={erros.tipo}
       >
-        {({ 'aria-describedby': descricaoId }) => (
+        {({ 'aria-describedby': descricaoId, 'aria-invalid': invalido }) => (
           <Segmentado
             rotulo="Tipo"
             opcoes={TIPOS}
@@ -92,6 +94,7 @@ function Formulario({ item, aoCancelar, aoSalvar }) {
             cheio
             desabilitado={tipoTravado}
             aria-describedby={descricaoId}
+            aria-invalid={invalido}
           />
         )}
       </Campo>
@@ -122,7 +125,7 @@ function Formulario({ item, aoCancelar, aoSalvar }) {
             <Input
               inputMode="numeric"
               value={limite}
-              onChange={(e) => setLimite(mascararValor(e.target.value))}
+              onChange={(e) => setLimite(mascararValor(e.target.value.replace(/\D/g, '').slice(0, DIGITOS_LIMITE)))}
               placeholder="0,00"
             />
           </Campo>

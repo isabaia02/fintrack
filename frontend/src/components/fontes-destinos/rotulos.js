@@ -12,6 +12,12 @@ export const TIPOS = [
   { valor: 'cartao_credito', rotulo: 'Cartão de crédito' },
 ];
 
+// Mesmo texto que a API devolve no 409 de exclusão (BE-04).
+export function mensagemExclusaoBloqueada(total) {
+  const vinculados = total === 1 ? 'lançamento vinculado' : 'lançamentos vinculados';
+  return `Este item tem ${total} ${vinculados}. Edite ou exclua esses lançamentos antes de excluir.`;
+}
+
 export function iconeDoItem(item) {
   if (item.tipo === 'conta' && item.reserva) return 'savings';
   return GRUPOS.find((g) => g.tipo === item.tipo).icone;

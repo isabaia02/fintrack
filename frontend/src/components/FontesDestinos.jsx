@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { DialogoConfirmarExclusao, DialogoExclusaoBloqueada } from './fontes-destinos/DialogosExclusao';
 import { GavetaFonte } from './fontes-destinos/GavetaFonte';
 import { GrupoFontes } from './fontes-destinos/GrupoFontes';
-import { GRUPOS } from './fontes-destinos/rotulos';
+import { GRUPOS, mensagemExclusaoBloqueada } from './fontes-destinos/rotulos';
 import { Carregando } from './ui/carregando';
+import { DialogoConfirmarExclusao, DialogoExclusaoBloqueada } from './ui/dialogo-exclusao';
 import { MensagemErro } from './ui/mensagem-erro';
 
 export default function FontesDestinos() {
@@ -52,7 +52,13 @@ export default function FontesDestinos() {
     recarregar();
   };
 
+  // Item com lançamentos já abre o aviso de bloqueio. O 409 de confirmarExclusao continua
+  // como fallback (ex.: outra aba criou um lançamento depois de a lista ser carregada).
   const pedirExclusao = (item) => {
+    if (item.total_lancamentos > 0) {
+      setBloqueio(mensagemExclusaoBloqueada(item.total_lancamentos));
+      return;
+    }
     setErroExclusao('');
     setParaExcluir(item);
   };
@@ -109,12 +115,15 @@ export default function FontesDestinos() {
         aoSalvar={aoSalvar}
       />
       <DialogoConfirmarExclusao
-        item={paraExcluir}
+        aberto={Boolean(paraExcluir)}
+        titulo="Excluir fonte ou destino?"
         aoCancelar={() => setParaExcluir(null)}
         aoConfirmar={confirmarExclusao}
         excluindo={excluindo}
         erro={erroExclusao}
-      />
+      >
+        O item <strong>{paraExcluir?.nome}</strong> será excluído. Esta ação não pode ser desfeita.
+      </DialogoConfirmarExclusao>
       <DialogoExclusaoBloqueada mensagem={bloqueio} aoFechar={() => setBloqueio('')} />
     </>
   );

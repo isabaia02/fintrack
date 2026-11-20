@@ -1,12 +1,15 @@
-import { Button } from '../ui/button';
-import { Dialogo } from '../ui/dialogo';
+import { Button } from './button';
+import { Dialogo } from './dialogo';
 
-export function DialogoConfirmarExclusao({ item, aoCancelar, aoConfirmar, excluindo, erro }) {
+// Confirmação de exclusão. `children` é a frase sobre o item, em texto corrido
+// (ex.: `O item <strong>{nome}</strong> será excluído. Esta ação não pode ser desfeita.`).
+export function DialogoConfirmarExclusao({ aberto, titulo, children, aoCancelar, aoConfirmar, excluindo = false, erro }) {
   return (
     <Dialogo
-      aberto={Boolean(item)}
+      aberto={aberto}
       aoFechar={aoCancelar}
-      titulo="Excluir fonte ou destino?"
+      bloqueada={excluindo}
+      titulo={titulo}
       acoes={(
         <>
           <Button variante="secondary" onClick={aoCancelar} disabled={excluindo}>Cancelar</Button>
@@ -14,9 +17,7 @@ export function DialogoConfirmarExclusao({ item, aoCancelar, aoConfirmar, exclui
         </>
       )}
     >
-      <p className="text-sm text-text-muted">
-        <strong className="font-medium text-text">{item?.nome}</strong> será excluído. Esta ação não pode ser desfeita.
-      </p>
+      <p className="text-sm text-text-muted [&_strong]:font-medium [&_strong]:text-text">{children}</p>
       {erro && <p role="alert" className="text-sm text-danger">{erro}</p>}
     </Dialogo>
   );
