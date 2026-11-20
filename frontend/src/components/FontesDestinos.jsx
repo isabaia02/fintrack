@@ -1,3 +1,3 @@
 export default function FontesDestinos() {
-  return <h1>FontesDestinos</h1>; // TODO
+  return <p className="text-text-muted">Em construção.</p>; // TODO
 }
