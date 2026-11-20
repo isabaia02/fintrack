@@ -1,6 +1,6 @@
-export function Segmentado({ opcoes, valor, onChange, rotulo }) {
+export function Segmentado({ opcoes, valor, onChange, rotulo, 'aria-describedby': descricaoId }) {
   return (
-    <div role="group" aria-label={rotulo} className="inline-flex gap-1 rounded-sm bg-surface-sunken p-1">
+    <div role="group" aria-label={rotulo} aria-describedby={descricaoId} className="inline-flex gap-1 rounded-sm bg-surface-sunken p-1">
       {opcoes.map((opcao) => {
         const ativo = opcao.valor === valor;
         return (
