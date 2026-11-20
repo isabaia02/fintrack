@@ -1,3 +1,5 @@
+export const ALGORITMO_JWT = 'HS256';
+
 export const jwtConfig = {
   get secret() {
     if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET não definido no .env');
