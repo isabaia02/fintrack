@@ -76,7 +76,7 @@ describe('categorias (integração com Postgres)', { skip: pular }, () => {
   async function lancar(usuario, categoriaId, vezes = 1) {
     const { rows: [fonte] } = await pool.query(
       `INSERT INTO fontes_destinos (usuario_id, nome, tipo) VALUES ($1, $2, 'conta')
-       ON CONFLICT (usuario_id, nome) DO UPDATE SET nome = EXCLUDED.nome RETURNING id`,
+       ON CONFLICT (usuario_id, LOWER(nome), tipo) DO UPDATE SET nome = EXCLUDED.nome RETURNING id`,
       [usuario.id, 'Conta'],
     );
     for (let i = 0; i < vezes; i += 1) {
