@@ -1,3 +1,3 @@
 export default function Lancamentos() {
-  return <h1>Lancamentos</h1>; // TODO
+  return <p className="text-text-muted">Em construção.</p>; // TODO
 }
