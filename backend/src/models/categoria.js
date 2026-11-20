@@ -1,7 +1,4 @@
 import { emTransacao, pool } from '../config/db.js';
-import { idValido } from '../utils/id.js';
-
-export { idValido };
 
 const TOTAL_SLOTS = 8;
 
