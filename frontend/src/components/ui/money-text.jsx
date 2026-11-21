@@ -1,7 +1,7 @@
 import { formatarMoeda } from '../../utils/formatadores';
 
 const tamanhos = {
-  lg: 'text-2xl font-medium',
+  lg: 'text-2xl font-medium tracking-[-0.01em]',
   md: 'text-sm',
   sm: 'text-xs',
 };
