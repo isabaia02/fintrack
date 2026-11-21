@@ -5,6 +5,8 @@ import { dividirEmParcelas, somarMeses } from './parcelamento.js';
 
 export { idValido };
 
+const TAMANHO_PAGINA = 20;
+
 const NOME_TIPO = { entrada: 'entrada', saida: 'saída' };
 
 const SELECT_LANCAMENTO = `
@@ -20,6 +22,51 @@ const SELECT_LANCAMENTO = `
 export async function buscar(usuarioId, id, client = pool) {
   const { rows } = await client.query(`${SELECT_LANCAMENTO} AND l.id = $2`, [usuarioId, id]);
   return rows[0] ?? null;
+}
+
+function condicoesDoFiltro(usuarioId, { inicio, fim, tipo, categoriaId, fonteDestinoId }) {
+  const params = [usuarioId, inicio, fim];
+  const condicoes = ['l.data BETWEEN $2 AND $3'];
+  const adicionar = (coluna, valor) => {
+    if (valor === null || valor === undefined) return;
+    params.push(valor);
+    condicoes.push(`${coluna} = $${params.length}`);
+  };
+  adicionar('l.tipo', tipo);
+  adicionar('l.categoria_id', categoriaId);
+  adicionar('l.fonte_destino_id', fonteDestinoId);
+  return { params, where: condicoes.map((c) => ` AND ${c}`).join('') };
+}
+
+export async function listar(usuarioId, filtros) {
+  const { params, where } = condicoesDoFiltro(usuarioId, filtros);
+  const deslocamento = (filtros.pagina - 1) * TAMANHO_PAGINA;
+
+  const [{ rows: itens }, { rows: [resumo] }] = await Promise.all([
+    pool.query(
+      `${SELECT_LANCAMENTO}${where}
+       ORDER BY l.data DESC, l.id DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, TAMANHO_PAGINA, deslocamento],
+    ),
+    pool.query(
+      `SELECT COUNT(*)::int AS total,
+              COALESCE(SUM(l.valor) FILTER (WHERE l.tipo = 'entrada'), 0)::float8 AS entradas,
+              COALESCE(SUM(l.valor) FILTER (WHERE l.tipo = 'saida'), 0)::float8 AS saidas,
+              COALESCE(SUM(CASE WHEN l.tipo = 'entrada' THEN l.valor ELSE -l.valor END), 0)::float8 AS saldo
+       FROM lancamentos l
+       WHERE l.usuario_id = $1${where}`,
+      params,
+    ),
+  ]);
+
+  return {
+    itens,
+    total: resumo.total,
+    pagina: filtros.pagina,
+    totalPaginas: Math.ceil(resumo.total / TAMANHO_PAGINA),
+    totais: { entradas: resumo.entradas, saidas: resumo.saidas, saldo: resumo.saldo },
+  };
 }
 
 async function buscarVarios(client, usuarioId, ids) {
