@@ -1,21 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useDialogoNativo } from '../../hooks/useDialogoNativo';
 import Icone from '../Icone';
 
-export function Dialogo({ aberto, aoFechar, titulo, icone, corIcone = 'text-warning', children, acoes, largura = 'w-[440px]' }) {
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const dialogo = ref.current;
-    if (aberto && !dialogo.open) dialogo.showModal();
-    if (!aberto && dialogo.open) dialogo.close();
-  }, [aberto]);
+export function Dialogo({ aberto, aoFechar, bloqueada = false, titulo, icone, corIcone = 'text-warning', children, acoes, largura = 'w-[440px]' }) {
+  const eventos = useDialogoNativo({ aberto, aoFechar, bloqueada });
 
   return (
     <dialog
-      ref={ref}
+      {...eventos}
       aria-labelledby="dialogo-titulo"
-      onClose={aoFechar}
-      onClick={(e) => { if (e.target === ref.current) aoFechar(); }}
       className={`m-auto max-w-[calc(100vw-32px)] rounded-lg border border-border bg-surface p-0 text-text backdrop:bg-text/40 ${largura}`}
     >
       {aberto && (
