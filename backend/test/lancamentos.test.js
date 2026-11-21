@@ -349,4 +349,165 @@ describe('lançamentos (integração com Postgres)', { skip: pular }, () => {
       assert.equal((await chamar(u, 'PATCH', `/${id}`, {})).status, 404, `PATCH /${id}`);
     }
   });
+  async function lancar(u, dados) {
+    const { status, corpo } = await chamar(u, 'POST', '', saida(u, dados));
+    assert.equal(status, 201);
+    return corpo;
+  }
+
+  const listar = (u, consulta = '') => chamar(u, 'GET', consulta ? `?${consulta}` : '');
+
+  test('GET exige autenticação', async () => {
+    assert.equal((await fetch(`${app.url}/api/lancamentos`)).status, 401);
+    assert.equal((await fetch(`${app.url}/api/lancamentos/1`)).status, 401);
+  });
+
+  test('lista o período com itens completos, ordem por data e totais via SUM', async () => {
+    const u = await novoUsuario();
+    await lancar(u, { tipo: 'entrada', valor: 6800, descricao: 'Salário', data: '2026-11-05', categoriaId: u.salario, fonteDestinoId: u.renda });
+    await lancar(u, { valor: 1500, descricao: 'Aluguel', data: '2026-11-05', fonteDestinoId: u.conta });
+    await lancar(u, { valor: 100, descricao: 'Cabo e carregador', data: '2026-11-15', parcelas: 3 });
+    await lancar(u, { valor: 72, descricao: 'Cinema', data: '2026-10-31', fonteDestinoId: u.conta });
+
+    const res = await listar(u, 'inicio=2026-11-01&fim=2026-11-30');
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.corpo.itens.map((l) => l.descricao), ['Cabo e carregador', 'Aluguel', 'Salário']);
+    assert.deepEqual(
+      { total: res.corpo.total, pagina: res.corpo.pagina, totalPaginas: res.corpo.totalPaginas },
+      { total: 3, pagina: 1, totalPaginas: 1 },
+    );
+    assert.deepEqual(res.corpo.totais, { entradas: 6800, saidas: 1533.34, saldo: 5266.66 });
+
+    const [parcela] = res.corpo.itens;
+    assert.equal(parcela.parcela_atual, 1);
+    assert.equal(parcela.total_parcelas, 3);
+    assert.deepEqual(parcela.categoria, { id: u.outros, nome: 'Outros', cor: 1 });
+    assert.deepEqual(parcela.fonteDestino, { id: u.visa, nome: 'Visa crédito', tipo: 'cartao_credito' });
+  });
+
+  test('sem datas usa o mês corrente', async () => {
+    const u = await novoUsuario();
+    const hoje = new Date();
+    const dia = (d) => new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth(), d)).toISOString().slice(0, 10);
+    await lancar(u, { descricao: 'Neste mês', data: dia(1), fonteDestinoId: u.conta });
+    await lancar(u, { descricao: 'Mês passado', data: dia(0), fonteDestinoId: u.conta });
+
+    const res = await listar(u);
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.corpo.itens.map((l) => l.descricao), ['Neste mês']);
+  });
+
+  test('filtros de tipo, categoria e fonte/destino se combinam e refletem nos totais', async () => {
+    const u = await novoUsuario();
+    const lazer = (await pool.query(
+      `INSERT INTO categorias (usuario_id, nome, tipo, cor) VALUES ($1, 'Lazer', 'saida', 3) RETURNING id`,
+      [u.id],
+    )).rows[0].id;
+    await lancar(u, { tipo: 'entrada', valor: 550, descricao: 'Logo', data: '2026-11-12', categoriaId: u.salario, fonteDestinoId: u.conta });
+    await lancar(u, { valor: 72, descricao: 'Cinema', data: '2026-11-10', categoriaId: lazer });
+    await lancar(u, { valor: 250, descricao: 'Consulta', data: '2026-11-09', fonteDestinoId: u.conta });
+    await lancar(u, { valor: 30, descricao: 'Pipoca', data: '2026-11-10', categoriaId: lazer, fonteDestinoId: u.conta });
+
+    const periodo = 'inicio=2026-11-01&fim=2026-11-30';
+    const saidas = await listar(u, `${periodo}&tipo=saida`);
+    assert.equal(saidas.corpo.total, 3);
+    assert.deepEqual(saidas.corpo.totais, { entradas: 0, saidas: 352, saldo: -352 });
+
+    const combinado = await listar(u, `${periodo}&tipo=saida&categoriaId=${lazer}&fonteDestinoId=${u.visa}`);
+    assert.deepEqual(combinado.corpo.itens.map((l) => l.descricao), ['Cinema']);
+    assert.deepEqual(combinado.corpo.totais, { entradas: 0, saidas: 72, saldo: -72 });
+
+    const naConta = await listar(u, `${periodo}&fonteDestinoId=${u.conta}`);
+    assert.equal(naConta.corpo.total, 3);
+    assert.deepEqual(naConta.corpo.totais, { entradas: 550, saidas: 280, saldo: 270 });
+  });
+
+  test('pagina de 20 em 20 com total e total de páginas', async () => {
+    const u = await novoUsuario();
+    await pool.query(
+      `INSERT INTO lancamentos (usuario_id, tipo, descricao, valor, data, categoria_id, fonte_destino_id)
+       SELECT $1, 'saida', 'Item ' || n, 10, DATE '2026-11-01' + (n % 30), $2, $3 FROM generate_series(1, 45) AS n`,
+      [u.id, u.outros, u.conta],
+    );
+    const periodo = 'inicio=2026-11-01&fim=2026-11-30';
+
+    const primeira = await listar(u, periodo);
+    assert.equal(primeira.corpo.itens.length, 20);
+    assert.deepEqual([primeira.corpo.total, primeira.corpo.totalPaginas], [45, 3]);
+    assert.equal(primeira.corpo.totais.saidas, 450);
+
+    const ultima = await listar(u, `${periodo}&pagina=3`);
+    assert.equal(ultima.corpo.itens.length, 5);
+    assert.equal(ultima.corpo.pagina, 3);
+    assert.equal(ultima.corpo.totais.saidas, 450);
+
+    const ids = new Set();
+    for (const pagina of [1, 2, 3]) {
+      (await listar(u, `${periodo}&pagina=${pagina}`)).corpo.itens.forEach((l) => ids.add(l.id));
+    }
+    assert.equal(ids.size, 45);
+
+    const alem = await listar(u, `${periodo}&pagina=9`);
+    assert.equal(alem.status, 200);
+    assert.deepEqual(alem.corpo.itens, []);
+    assert.equal(alem.corpo.total, 45);
+  });
+
+  test('período sem lançamentos devolve lista vazia e totais zerados', async () => {
+    const u = await novoUsuario();
+    const res = await listar(u, 'inicio=2026-01-01&fim=2026-01-31');
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.corpo, {
+      itens: [], total: 0, pagina: 1, totalPaginas: 0,
+      totais: { entradas: 0, saidas: 0, saldo: 0 },
+    });
+  });
+
+  test('filtros inválidos devolvem 400 por campo', async () => {
+    const u = await novoUsuario();
+    const casos = [
+      ['inicio=2026-02-30', 'inicio'],
+      ['inicio=01/11/2026&fim=2026-11-30', 'inicio'],
+      ['inicio=2026-11-01&fim=amanha', 'fim'],
+      ['inicio=2026-11-30&fim=2026-11-01', 'fim'],
+      ['tipo=transferencia', 'tipo'],
+      ['categoriaId=abc', 'categoriaId'],
+      ['fonteDestinoId=-1', 'fonteDestinoId'],
+      ['pagina=0', 'pagina'],
+      ['pagina=1.5', 'pagina'],
+      ['tipo=saida&tipo=entrada', 'tipo'],
+    ];
+    for (const [consulta, campo] of casos) {
+      const res = await listar(u, consulta);
+      assert.equal(res.status, 400, consulta);
+      assert.equal(res.corpo.erro, 'Dados inválidos.', consulta);
+      assert.ok(res.corpo.campos[campo], `${consulta} → campos.${campo}`);
+    }
+  });
+
+  test('a listagem não mostra lançamentos de outro usuário', async () => {
+    const dono = await novoUsuario();
+    const outro = await novoUsuario();
+    await lancar(dono, { data: '2026-11-10' });
+
+    const res = await listar(outro, `inicio=2026-11-01&fim=2026-11-30&categoriaId=${dono.outros}`);
+    assert.equal(res.corpo.total, 0);
+    assert.deepEqual(res.corpo.totais, { entradas: 0, saidas: 0, saldo: 0 });
+  });
+
+  test('GET /:id devolve o lançamento do usuário e 404 para o de outro', async () => {
+    const dono = await novoUsuario();
+    const intruso = await novoUsuario();
+    const [lancamento] = await lancar(dono, { parcelas: 2 });
+
+    const res = await chamar(dono, 'GET', `/${lancamento.id}`);
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.corpo, lancamento);
+
+    assert.deepEqual(await chamar(intruso, 'GET', `/${lancamento.id}`), { status: 404, corpo: { erro: 'Lançamento não encontrado.' } });
+    for (const id of ['999999', 'abc', '0']) {
+      assert.equal((await chamar(dono, 'GET', `/${id}`)).status, 404, `GET /${id}`);
+    }
+  });
 });

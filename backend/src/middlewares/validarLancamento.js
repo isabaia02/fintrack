@@ -78,3 +78,49 @@ export function validarExclusao(req, res, next) {
   req.todasParcelas = todasParcelas === 'true';
   return next();
 }
+
+const iso = (data) => data.toISOString().slice(0, 10);
+
+function mesCorrente(hoje = new Date()) {
+  const ano = hoje.getFullYear();
+  const mes = hoje.getMonth();
+  return { inicio: iso(new Date(Date.UTC(ano, mes, 1))), fim: iso(new Date(Date.UTC(ano, mes + 1, 0))) };
+}
+
+function lerId(valor, campo, mensagem, campos) {
+  if (vazio(valor)) return null;
+  const id = idValido(valor);
+  if (!id) campos[campo] = mensagem;
+  return id;
+}
+
+export function validarFiltrosLancamento(req, res, next) {
+  const consulta = req.query ?? {};
+  const campos = {};
+  const padrao = mesCorrente();
+
+  const inicio = vazio(consulta.inicio) ? padrao.inicio : consulta.inicio;
+  const fim = vazio(consulta.fim) ? padrao.fim : consulta.fim;
+  if (!dataValida(inicio)) campos.inicio = 'Informe uma data inicial válida (AAAA-MM-DD).';
+  if (!dataValida(fim)) campos.fim = 'Informe uma data final válida (AAAA-MM-DD).';
+  if (!campos.inicio && !campos.fim && inicio > fim) {
+    campos.fim = 'A data final deve ser igual ou posterior à data inicial.';
+  }
+
+  const { tipo } = consulta;
+  if (!vazio(tipo) && !TIPOS_LANCAMENTO.includes(tipo)) campos.tipo = 'O tipo deve ser "entrada" ou "saida".';
+
+  const categoriaId = lerId(consulta.categoriaId, 'categoriaId', 'Categoria inválida.', campos);
+  const fonteDestinoId = lerId(consulta.fonteDestinoId, 'fonteDestinoId', 'Fonte ou destino inválido.', campos);
+
+  let pagina = 1;
+  if (!vazio(consulta.pagina)) {
+    pagina = idValido(consulta.pagina);
+    if (!pagina) campos.pagina = 'A página deve ser um número inteiro maior que zero.';
+  }
+
+  if (Object.keys(campos).length) return responderInvalido(res, campos);
+
+  req.filtros = { inicio, fim, tipo: vazio(tipo) ? null : tipo, categoriaId, fonteDestinoId, pagina };
+  return next();
+}
