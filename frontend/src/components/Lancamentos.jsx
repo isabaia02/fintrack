@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { usePeriodo } from '../contexts/periodo';
 import { BarraFiltros } from './lancamentos/BarraFiltros';
+import { DialogoExcluirLancamento } from './lancamentos/DialogoExcluirLancamento';
 import { GavetaLancamento } from './lancamentos/GavetaLancamento';
 import { TabelaLancamentos } from './lancamentos/TabelaLancamentos';
 import { TotaisPeriodo } from './lancamentos/TotaisPeriodo';
@@ -32,6 +33,7 @@ export default function Lancamentos() {
   const [versao, setVersao] = useState(0);
   const [opcoes, setOpcoes] = useState({ categorias: [], fontes: [] });
   const [resultado, setResultado] = useState({ chave: null, dados: null, erro: '' });
+  const [paraExcluir, setParaExcluir] = useState(null);
 
   const { inicio, fim } = periodo;
   const chave = chaveDaConsulta(montarParametros({ inicio, fim, pagina, ...filtros }), versao);
@@ -55,7 +57,9 @@ export default function Lancamentos() {
     const chaveAtual = chaveDaConsulta(params, versao);
     api.get('/lancamentos', { params })
       .then(({ data }) => {
-        if (ativo) setResultado({ chave: chaveAtual, dados: data, erro: '' });
+        if (!ativo) return;
+        if (data.itens.length === 0 && pagina > 1 && data.totalPaginas > 0) setPagina(data.totalPaginas);
+        else setResultado({ chave: chaveAtual, dados: data, erro: '' });
       })
       .catch((e) => {
         if (ativo) setResultado({ chave: chaveAtual, dados: null, erro: e.response?.data?.erro ?? 'Não foi possível carregar os lançamentos.' });
@@ -102,7 +106,11 @@ export default function Lancamentos() {
   };
 
   const editar = (lancamento) => setSearchParams({ editar: String(lancamento.id) });
-  const excluir = (lancamento) => setSearchParams({ excluir: String(lancamento.id) });
+
+  const aoExcluir = () => {
+    setParaExcluir(null);
+    setVersao((v) => v + 1);
+  };
 
   const { dados, erro } = resultado;
 
@@ -138,7 +146,7 @@ export default function Lancamentos() {
         <TabelaLancamentos
           lancamentos={dados.itens}
           aoEditar={editar}
-          aoExcluir={excluir}
+          aoExcluir={setParaExcluir}
           rodape={(
             <Paginacao
               pagina={dados.pagina}
@@ -161,6 +169,15 @@ export default function Lancamentos() {
           fontes={opcoes.fontes}
           aoCancelar={fecharGaveta}
           aoSalvar={aoSalvar}
+        />
+      )}
+
+      {paraExcluir && (
+        <DialogoExcluirLancamento
+          key={paraExcluir.id}
+          lancamento={paraExcluir}
+          aoCancelar={() => setParaExcluir(null)}
+          aoExcluir={aoExcluir}
         />
       )}
     </div>
