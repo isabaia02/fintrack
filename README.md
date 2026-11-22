@@ -78,6 +78,12 @@ Implementadas até agora: `GET /api/health`, `POST /api/auth/cadastro`, `POST /a
 
 Regras de fontes e destinos: o nome é único por usuário **e tipo** (uma conta e um cartão podem se chamar "Nubank"). Enquanto o item tiver lançamentos, o `PUT` devolve 409 se mudar o `tipo`, o `dia_fechamento` ou o `dia_vencimento`, para que as faturas (calculadas a partir da data da compra e dos dias atuais do cartão) não mudem retroativamente.
 
+### Relatório por categoria
+- `GET /api/relatorios/categorias?inicio=AAAA-MM-DD&fim=AAAA-MM-DD`. Sem `inicio`/`fim` vale o mês corrente no horário de Brasília, como na listagem; período inválido devolve `400` com `campos`.
+- Resposta: `{ periodo, periodoAnterior, saidas, entradas }`. `saidas` e `entradas` trazem `total`, `totalAnterior`, `variacaoPercentual` e `categorias`, em ordem decrescente de total. Cada categoria tem `id`, `nome`, `cor`, `total`, `percentual` (sobre o total do seu tipo, 2 casas), `totalAnterior` e `variacaoPercentual` (1 casa; `0` sem variação e `null` quando não havia valor no período anterior).
+- As somas são feitas no banco com `GROUP BY`/`SUM`. Categorias que só tiveram valor no período anterior aparecem com `total` 0.
+- **Período anterior:** quando o filtro cobre meses inteiros, compara com a mesma quantidade de meses imediatamente antes (outubro → setembro; jan–mar → out–dez). Nos demais casos, usa a mesma quantidade de dias logo antes do `inicio` (10–19/10 → 30/09–09/10).
+
 ## Design system (front-end)
 - Tokens do Figma em `frontend/src/index.css`, com modo claro e escuro (`[data-theme="dark"]`). Use as classes do Tailwind (`bg-surface`, `text-text-muted`, `border-border-strong`...), sem cores soltas.
 - Componentes base em `frontend/src/components/ui`: `Button`, `Badge`, `Input`, `Select`, `Segmentado` e `MoneyText`.
