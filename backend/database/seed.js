@@ -4,6 +4,7 @@ import bcrypt from 'bcrypt';
 import pg from 'pg';
 import { CUSTO_BCRYPT } from '../src/config/senha.js';
 import { categoriasPadrao } from '../src/models/padroes.js';
+import { dividirEmParcelas, somarMeses } from '../src/models/parcelamento.js';
 
 const SENHA = 'senha1234'; // senha dos usuários de demonstração
 
@@ -19,13 +20,6 @@ const fontes = [
   { nome: 'Cartão Nubank', tipo: 'cartao_credito', fech: 3, venc: 10, limite: 5000 },
   { nome: 'Visa crédito', tipo: 'cartao_credito', fech: 25, venc: 5, limite: 3000 },
 ];
-
-function dividir(valor, n) {
-  const centavos = Math.round(valor * 100);
-  const base = Math.floor(centavos / n);
-  const resto = centavos - base * n;
-  return Array.from({ length: n }, (_, i) => (base + (i === 0 ? resto : 0)) / 100);
-}
 
 const iso = (ano, mes, dia) => new Date(Date.UTC(ano, mes, dia)).toISOString().slice(0, 10);
 
@@ -83,9 +77,9 @@ try {
 
     const grupo = randomUUID();
     const dataCompra = iso(hoje.getUTCFullYear(), hoje.getUTCMonth() - 2, 15);
-    const parcelas = dividir(3000, 10);
+    const parcelas = dividirEmParcelas(3000, 10);
     for (let i = 0; i < parcelas.length; i++) {
-      await inserir('saida', 'Notebook', parcelas[i], dataCompra, 'Educação', 'Cartão Nubank', i + 1, 10, grupo);
+      await inserir('saida', 'Notebook', parcelas[i], somarMeses(dataCompra, i), 'Educação', 'Cartão Nubank', i + 1, 10, grupo);
     }
   }
 
