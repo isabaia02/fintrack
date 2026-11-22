@@ -34,10 +34,13 @@ CREATE TABLE fontes_destinos (
   dia_vencimento  SMALLINT CHECK (dia_vencimento BETWEEN 1 AND 31),
   limite          NUMERIC(12, 2),
   reserva         BOOLEAN NOT NULL DEFAULT FALSE,
-  UNIQUE (usuario_id, nome),
   CHECK (tipo <> 'cartao_credito'
          OR (dia_fechamento IS NOT NULL AND dia_vencimento IS NOT NULL AND limite IS NOT NULL))
 );
+
+-- Nome único por usuário e tipo, sem diferenciar maiúsculas/minúsculas
+-- (uma conta e um cartão podem se chamar "Nubank").
+CREATE UNIQUE INDEX fontes_destinos_nome_unico ON fontes_destinos (usuario_id, LOWER(nome), tipo);
 
 CREATE TABLE lancamentos (
   id                  SERIAL PRIMARY KEY,

@@ -1,18 +1,12 @@
 import { emTransacao, pool } from '../config/db.js';
 
 const TOTAL_SLOTS = 8;
-const ID_MAX = 2147483647; 
 
 const SELECT_COM_TOTAL = `
   SELECT c.id, c.nome, c.tipo, c.cor, COUNT(l.id)::int AS total_lancamentos
   FROM categorias c
   LEFT JOIN lancamentos l ON l.categoria_id = c.id AND l.usuario_id = c.usuario_id
   WHERE c.usuario_id = $1`;
-
-export function idValido(valor) {
-  const id = Number(valor);
-  return /^\d+$/.test(String(valor)) && id >= 1 && id <= ID_MAX ? id : null;
-}
 
 export function nomeDuplicado(erro) {
   return erro.code === '23505' && erro.constraint === 'categorias_nome_unico';
