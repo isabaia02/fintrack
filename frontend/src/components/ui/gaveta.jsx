@@ -2,7 +2,7 @@ import { useId } from 'react';
 import { useDialogoNativo } from '../../hooks/useDialogoNativo';
 import Icone from '../Icone';
 
-export function Gaveta({ aberto, aoFechar, bloqueada = false, titulo, aoEnviar, rodape, children }) {
+export function Gaveta({ aberto, aoFechar, bloqueada = false, titulo, aoEnviar, aoTeclar, rodape, children }) {
   const tituloId = useId();
   const eventos = useDialogoNativo({ aberto, aoFechar, bloqueada });
 
@@ -15,7 +15,7 @@ export function Gaveta({ aberto, aoFechar, bloqueada = false, titulo, aoEnviar, 
       className="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-none w-[480px] max-w-full border-l border-border bg-surface p-0 text-text backdrop:bg-text/40 open:flex"
     >
       {aberto && (
-        <Raiz onSubmit={aoEnviar} noValidate className="flex min-h-0 flex-1 flex-col">
+        <Raiz onSubmit={aoEnviar} onKeyDown={aoTeclar} noValidate className="flex min-h-0 flex-1 flex-col">
           <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
             <div className="flex items-center justify-between">
               <h2 id={tituloId}>{titulo}</h2>
