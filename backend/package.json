@@ -9,7 +9,7 @@
     "start": "node src/server.js",
     "db:schema": "node database/run-schema.js",
     "db:seed": "node database/seed.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test --test-concurrency=1 test/*.test.js"
   },
   "engines": {
     "node": ">=20"

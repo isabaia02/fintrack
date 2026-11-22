@@ -8,7 +8,7 @@ export function Campo({ label, ajuda, erro, children, className = '' }) {
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
-      <label htmlFor={id} className="text-sm font-medium text-text">{label}</label>
+      {label && <label htmlFor={id} className="text-sm font-medium text-text">{label}</label>}
       {typeof children === 'function' ? children(props) : isValidElement(children) ? cloneElement(children, props) : children}
       {erro ? (
         <p id={descricaoId} className="flex items-center gap-1 text-xs text-danger">
