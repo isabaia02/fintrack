@@ -30,7 +30,7 @@ async function buscarVarios(client, usuarioId, ids) {
   return rows;
 }
 
-async function conferirReferencias(client, usuarioId, dados, campos, totalParcelas) {
+async function conferirReferencias(client, usuarioId, dados, campos) {
   if (!campos.categoriaId) {
     const { rows: [categoria] } = await client.query(
       'SELECT tipo FROM categorias WHERE id = $1 AND usuario_id = $2 FOR SHARE',
@@ -43,17 +43,42 @@ async function conferirReferencias(client, usuarioId, dados, campos, totalParcel
     }
   }
 
-  if (!campos.fonteDestinoId) {
-    const { rows: [fonteDestino] } = await client.query(
-      'SELECT tipo FROM fontes_destinos WHERE id = $1 AND usuario_id = $2 FOR SHARE',
-      [dados.fonteDestinoId, usuarioId],
-    );
-    if (!fonteDestino) {
-      campos.fonteDestinoId = 'Fonte ou destino não encontrado.';
-    } else if (!campos.parcelas && totalParcelas > 1 && fonteDestino.tipo !== 'cartao_credito') {
-      campos.parcelas = 'O parcelamento só está disponível para cartão de crédito.';
-    }
+  if (campos.fonteDestinoId) return null;
+  const { rows: [fonteDestino] } = await client.query(
+    'SELECT tipo FROM fontes_destinos WHERE id = $1 AND usuario_id = $2 FOR SHARE',
+    [dados.fonteDestinoId, usuarioId],
+  );
+  if (!fonteDestino) campos.fonteDestinoId = 'Fonte ou destino não encontrado.';
+  return fonteDestino?.tipo ?? null;
+}
+
+function conferirParcelamento(dados, tipoFonte, campos) {
+  if (campos.parcelas || campos.tipo || !tipoFonte) return;
+  if (dados.tipo !== 'saida' || tipoFonte !== 'cartao_credito') {
+    campos.parcelas = 'O parcelamento só está disponível para saídas no cartão de crédito.';
   }
+}
+
+function conferirParcelaEditada(dados, tipoFonte, campos) {
+  if (!campos.tipo && dados.tipo !== 'saida') {
+    campos.tipo = 'Uma compra parcelada precisa continuar como saída.';
+  }
+  if (tipoFonte && tipoFonte !== 'cartao_credito') {
+    campos.fonteDestinoId = 'As parcelas de uma compra precisam continuar em um cartão de crédito.';
+  }
+}
+
+async function renumerarParcelas(client, usuarioId, grupo) {
+  await client.query(
+    `UPDATE lancamentos l
+     SET parcela_atual = r.ordem, total_parcelas = r.total,
+         grupo_parcelamento = CASE WHEN r.total > 1 THEN l.grupo_parcelamento END
+     FROM (SELECT id, ROW_NUMBER() OVER (ORDER BY parcela_atual) AS ordem, COUNT(*) OVER () AS total
+           FROM lancamentos
+           WHERE grupo_parcelamento = $1 AND usuario_id = $2) r
+     WHERE l.id = r.id`,
+    [grupo, usuarioId],
+  );
 }
 
 const temErros = (campos) => Object.keys(campos).length > 0;
@@ -62,7 +87,8 @@ export function criar(usuarioId, dados, errosDeEntrada = {}) {
   return emTransacao(async (client) => {
     const campos = { ...errosDeEntrada };
     const totalParcelas = dados.parcelas ?? 1;
-    await conferirReferencias(client, usuarioId, dados, campos, totalParcelas);
+    const tipoFonte = await conferirReferencias(client, usuarioId, dados, campos);
+    if (totalParcelas > 1) conferirParcelamento(dados, tipoFonte, campos);
 
     const valores = campos.valor ? [] : dividirEmParcelas(dados.valor, totalParcelas);
     if (!campos.parcelas && valores.some((v) => v <= 0)) {
@@ -89,7 +115,7 @@ export function criar(usuarioId, dados, errosDeEntrada = {}) {
 export function atualizar(usuarioId, id, dados, errosDeEntrada = {}) {
   return emTransacao(async (client) => {
     const { rows: [atual] } = await client.query(
-      'SELECT id, total_parcelas FROM lancamentos WHERE id = $1 AND usuario_id = $2 FOR UPDATE',
+      'SELECT id, total_parcelas, grupo_parcelamento FROM lancamentos WHERE id = $1 AND usuario_id = $2 FOR UPDATE',
       [id, usuarioId],
     );
     if (!atual) return { naoEncontrado: true };
@@ -98,14 +124,19 @@ export function atualizar(usuarioId, id, dados, errosDeEntrada = {}) {
     if (!campos.parcelas && dados.parcelas !== null && dados.parcelas !== atual.total_parcelas) {
       campos.parcelas = 'Não é possível alterar o número de parcelas de um lançamento já cadastrado.';
     }
-    await conferirReferencias(client, usuarioId, dados, campos, atual.total_parcelas);
+    const tipoFonte = await conferirReferencias(client, usuarioId, dados, campos);
+    if (atual.total_parcelas > 1) conferirParcelaEditada(dados, tipoFonte, campos);
     if (temErros(campos)) return { invalido: campos };
 
     await client.query(
+      'UPDATE lancamentos SET valor = $1, data = $2 WHERE id = $3 AND usuario_id = $4',
+      [dados.valor, dados.data, id, usuarioId],
+    );
+    await client.query(
       `UPDATE lancamentos
-       SET tipo = $1, descricao = $2, valor = $3, data = $4, categoria_id = $5, fonte_destino_id = $6
-       WHERE id = $7 AND usuario_id = $8`,
-      [dados.tipo, dados.descricao, dados.valor, dados.data, dados.categoriaId, dados.fonteDestinoId, id, usuarioId],
+       SET tipo = $1, descricao = $2, categoria_id = $3, fonte_destino_id = $4
+       WHERE usuario_id = $5 AND (id = $6 OR grupo_parcelamento = $7)`,
+      [dados.tipo, dados.descricao, dados.categoriaId, dados.fonteDestinoId, usuarioId, id, atual.grupo_parcelamento],
     );
     return { lancamento: await buscar(usuarioId, id, client) };
   });
@@ -126,6 +157,7 @@ export function excluir(usuarioId, id, todasParcelas) {
       );
     } else {
       await client.query('DELETE FROM lancamentos WHERE id = $1 AND usuario_id = $2', [id, usuarioId]);
+      if (lancamento.grupo_parcelamento) await renumerarParcelas(client, usuarioId, lancamento.grupo_parcelamento);
     }
     return { removido: true };
   });

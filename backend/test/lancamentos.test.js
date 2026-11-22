@@ -227,11 +227,19 @@ describe('lançamentos (integração com Postgres)', { skip: pular }, () => {
     assert.equal((await chamar(u, 'POST', '', saida(u, { parcelas: 48 }))).status, 201);
   });
 
-  test('parcelamento só é aceito em cartão de crédito', async () => {
+  test('parcelamento só é aceito em saídas no cartão de crédito', async () => {
     const u = await novoUsuario();
-    const res = await chamar(u, 'POST', '', saida(u, { fonteDestinoId: u.conta, parcelas: 3 }));
-    assert.equal(res.status, 400);
-    assert.deepEqual(res.corpo.campos, { parcelas: 'O parcelamento só está disponível para cartão de crédito.' });
+    const mensagem = { parcelas: 'O parcelamento só está disponível para saídas no cartão de crédito.' };
+
+    const naConta = await chamar(u, 'POST', '', saida(u, { fonteDestinoId: u.conta, parcelas: 3 }));
+    assert.equal(naConta.status, 400);
+    assert.deepEqual(naConta.corpo.campos, mensagem);
+
+    const entrada = await chamar(u, 'POST', '', saida(u, { tipo: 'entrada', categoriaId: u.salario, parcelas: 3 }));
+    assert.equal(entrada.status, 400);
+    assert.deepEqual(entrada.corpo.campos, mensagem);
+
+    assert.equal(await contar(u), 0);
     assert.equal((await chamar(u, 'POST', '', saida(u, { fonteDestinoId: u.conta, parcelas: 1 }))).status, 201);
   });
 
@@ -274,12 +282,51 @@ describe('lançamentos (integração com Postgres)', { skip: pular }, () => {
     assert.ok(tipoErrado.corpo.campos.categoriaId);
 
     const semCartao = await chamar(u, 'PUT', `/${segunda.id}`, saida(u, { fonteDestinoId: u.conta }));
-    assert.deepEqual(Object.keys(semCartao.corpo.campos), ['parcelas']);
+    assert.deepEqual(semCartao.corpo.campos, {
+      fonteDestinoId: 'As parcelas de uma compra precisam continuar em um cartão de crédito.',
+    });
+
+    const comoEntrada = await chamar(u, 'PUT', `/${segunda.id}`, saida(u, { tipo: 'entrada', categoriaId: u.salario }));
+    assert.deepEqual(comoEntrada.corpo.campos, { tipo: 'Uma compra parcelada precisa continuar como saída.' });
 
     const outroTotal = await chamar(u, 'PUT', `/${segunda.id}`, saida(u, { parcelas: 5 }));
     assert.deepEqual(Object.keys(outroTotal.corpo.campos), ['parcelas']);
 
     assert.equal((await chamar(u, 'PUT', `/${segunda.id}`, saida(u, { parcelas: 3 }))).status, 200);
+  });
+
+  test('editar uma parcela aplica descrição, categoria e fonte à compra toda; valor e data são da parcela', async () => {
+    const u = await novoUsuario();
+    const lazer = (await pool.query(
+      "INSERT INTO categorias (usuario_id, nome, tipo, cor) VALUES ($1, 'Lazer', 'saida', 4) RETURNING id",
+      [u.id],
+    )).rows[0].id;
+    const nubank = (await pool.query(
+      `INSERT INTO fontes_destinos (usuario_id, nome, tipo, dia_fechamento, dia_vencimento, limite)
+       VALUES ($1, 'Nubank', 'cartao_credito', 3, 10, 8000) RETURNING id`,
+      [u.id],
+    )).rows[0].id;
+    const { corpo: parcelas } = await chamar(u, 'POST', '', saida(u, { parcelas: 3 }));
+    const { corpo: [avulso] } = await chamar(u, 'POST', '', saida(u, { descricao: 'Avulso' }));
+
+    const res = await chamar(u, 'PATCH', `/${parcelas[1].id}`, {
+      descricao: 'Notebook Dell', categoriaId: lazer, fonteDestinoId: nubank, valor: 40, data: '2026-12-20',
+    });
+    assert.equal(res.status, 200);
+
+    const { rows } = await pool.query(
+      `SELECT descricao, categoria_id, fonte_destino_id, valor::float8 AS valor, TO_CHAR(data, 'YYYY-MM-DD') AS data
+       FROM lancamentos WHERE grupo_parcelamento = $1 ORDER BY parcela_atual`,
+      [parcelas[0].grupo_parcelamento],
+    );
+    assert.deepEqual(rows, [
+      { descricao: 'Notebook Dell', categoria_id: lazer, fonte_destino_id: nubank, valor: 33.34, data: '2026-11-17' },
+      { descricao: 'Notebook Dell', categoria_id: lazer, fonte_destino_id: nubank, valor: 40, data: '2026-12-20' },
+      { descricao: 'Notebook Dell', categoria_id: lazer, fonte_destino_id: nubank, valor: 33.33, data: '2027-01-17' },
+    ]);
+
+    const { corpo: intacto } = await chamar(u, 'PATCH', `/${avulso.id}`, {});
+    assert.equal(intacto.descricao, 'Avulso');
   });
 
   test('PATCH altera só os campos enviados e valida o resultado', async () => {
@@ -319,6 +366,28 @@ describe('lançamentos (integração com Postgres)', { skip: pular }, () => {
     assert.deepEqual(rows.map((r) => r.id), outra.map((l) => l.id));
 
     assert.equal((await chamar(u, 'DELETE', `/${outra[0].id}?todasParcelas=talvez`)).status, 400);
+  });
+
+  test('excluir só uma parcela renumera as restantes da compra', async () => {
+    const u = await novoUsuario();
+    const { corpo: compra } = await chamar(u, 'POST', '', saida(u, { parcelas: 3 }));
+    const parcelasDaCompra = async () => (await pool.query(
+      `SELECT id, parcela_atual, total_parcelas, grupo_parcelamento FROM lancamentos
+       WHERE id = ANY($1::int[]) ORDER BY id`,
+      [compra.map((l) => l.id)],
+    )).rows;
+    const grupo = compra[0].grupo_parcelamento;
+
+    await chamar(u, 'DELETE', `/${compra[1].id}`);
+    assert.deepEqual(await parcelasDaCompra(), [
+      { id: compra[0].id, parcela_atual: 1, total_parcelas: 2, grupo_parcelamento: grupo },
+      { id: compra[2].id, parcela_atual: 2, total_parcelas: 2, grupo_parcelamento: grupo },
+    ]);
+
+    await chamar(u, 'DELETE', `/${compra[0].id}`);
+    assert.deepEqual(await parcelasDaCompra(), [
+      { id: compra[2].id, parcela_atual: 1, total_parcelas: 1, grupo_parcelamento: null },
+    ]);
   });
 
   test('DELETE com todasParcelas em lançamento simples remove só ele', async () => {
