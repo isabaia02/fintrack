@@ -4,6 +4,7 @@ import {
   responderInvalido,
   validarDadosLancamento,
   validarExclusao,
+  validarFiltrosLancamento,
 } from '../middlewares/validarLancamento.js';
 import * as Lancamento from '../models/lancamento.js';
 
@@ -30,6 +31,26 @@ async function salvarEdicao(req, res, id, { dados, campos }) {
   if (resultado.invalido) return responderInvalido(res, resultado.invalido);
   return res.json(resultado.lancamento);
 }
+
+router.get('/', validarFiltrosLancamento, async (req, res, next) => {
+  try {
+    res.json(await Lancamento.listar(req.usuarioId, req.filtros));
+  } catch (erro) {
+    next(erro);
+  }
+});
+
+router.get('/:id', async (req, res, next) => {
+  const id = Lancamento.idValido(req.params.id);
+  if (!id) return res.status(404).json(NAO_ENCONTRADO);
+  try {
+    const lancamento = await Lancamento.buscar(req.usuarioId, id);
+    if (!lancamento) return res.status(404).json(NAO_ENCONTRADO);
+    return res.json(lancamento);
+  } catch (erro) {
+    return next(erro);
+  }
+});
 
 router.post('/', async (req, res, next) => {
   try {
