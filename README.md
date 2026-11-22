@@ -58,7 +58,7 @@ TEST_DATABASE_URL=postgresql://localhost:5432/fintrack_test npm test
 ```
 
 ## Rotas
-Implementadas até agora: `GET /api/health`, `POST /api/auth/cadastro`, `POST /api/auth/login` (limite de tentativas; ajustável por `LOGIN_RATE_LIMIT_MAX`) e `GET /api/auth/me` (requer `Authorization: Bearer <token>`), além do CRUD de `/api/categorias` e de `/api/fontes-destinos` (`GET`/`POST` e `PUT`/`DELETE` em `/:id`, todos autenticados) e de `/api/lancamentos` (`GET`/`POST`, `GET`/`PUT`/`PATCH` em `/:id` e `DELETE /:id[?todasParcelas=true]`). As demais (relatórios) seguem a tabela 10.5 do enunciado e serão adicionadas.
+Implementadas até agora: `GET /api/health`, `POST /api/auth/cadastro`, `POST /api/auth/login` (limite de tentativas; ajustável por `LOGIN_RATE_LIMIT_MAX`) e `GET /api/auth/me` (requer `Authorization: Bearer <token>`), além do CRUD de `/api/categorias` e de `/api/fontes-destinos` (`GET`/`POST` e `PUT`/`DELETE` em `/:id`, todos autenticados) e de `/api/lancamentos` (`GET`/`POST`, `GET`/`PUT`/`PATCH` em `/:id` e `DELETE /:id[?todasParcelas=true]`). e `GET /api/relatorios/faturas`. As demais (relatórios) seguem a tabela 10.5 do enunciado e serão adicionadas.
 
 ### Lançamentos e parcelamento
 - Corpo: `{ tipo, valor, descricao, data (AAAA-MM-DD), categoriaId, fonteDestinoId, parcelas? }`. A categoria e a fonte/destino precisam ser do usuário e a categoria precisa ter o mesmo tipo do lançamento. Erros vêm por campo em `{ erro, campos }` (ex.: `campos.valor`, `campos.categoriaId`), todos de uma vez.
@@ -84,3 +84,25 @@ Regras de fontes e destinos: o nome é único por usuário **e tipo** (uma conta
 - Ícones: Material Icons (Outlined) com `<Icone nome="add" />`, usando o nome do ícone do Figma.
 - Foco inicial em `Gaveta` e `Dialogo`: marque o campo com `data-autofocus` (não `autoFocus`). O `autoFocus` do React roda antes de o `<dialog>` abrir e o foco acaba no botão "Fechar".
 - Fechamento de `Gaveta` e `Dialogo` (`useDialogoNativo`): Esc e clique fora não fecham o `<dialog>` direto; chamam `aoFechar` e quem usa o componente decide (ex.: a gaveta de lançamento pergunta "Descartar alterações?"). Se o navegador fechar mesmo assim (alguns ignoram o cancelamento no Esc repetido), o diálogo é reaberto e `aoFechar` é chamado, para o estado do React e o do DOM não se desencontrarem. Com `bloqueada`, nada fecha.
+
+### Faturas de cartão
+`GET /api/relatorios/faturas?meses=3` devolve, para cada cartão de crédito do usuário, a fatura atual (aberta) e as `meses` seguintes (padrão 3, de 0 a 24; valor inválido dá `400` em `campos.meses`):
+
+```jsonc
+{ "cartoes": [{
+    "id": 1, "nome": "Visa crédito", "dia_fechamento": 25, "dia_vencimento": 5,
+    "limite": 5000, "limite_utilizado": 3772, "limite_disponivel": 1228,
+    "faturas": [{
+      "referencia": "12/2026",            // MM/AAAA do vencimento
+      "fechamento": "2026-11-25", "vencimento": "2026-12-05",
+      "aberta": true,                     // só a fatura atual
+      "itens": [{ "id": 7, "descricao": "Notebook", "data": "2026-11-20", "valor": 450, "parcela_atual": 3, "total_parcelas": 10 }],
+      "total": 555.34                     // fatura sem itens: "itens": [], "total": 0
+    }]
+}] }
+```
+
+- **O que guardamos: a data da parcela.** Nem a data da compra repetida em todas as parcelas, nem a data da fatura: cada parcela é um lançamento com a própria `data` = data da compra + (k − 1) meses (ex.: compra em 20/09 em 10× → 20/09, 20/10, 20/11…). A fatura de cada lançamento sai de `calcularFatura(data, cartao)`, tratando a data da parcela como uma compra, então a regra de fechamento (compra no dia do fechamento cai na fatura do mês seguinte) vale para todas as parcelas. A vantagem é que editar a data de uma parcela só muda a fatura dela. Limitação: se o dia da compra for 29–31 e o fechamento for depois dele, uma parcela em mês curto (fevereiro) pode cair na fatura seguinte, porque o dia 29–31 já foi ajustado ao gravar a parcela.
+- **Fatura atual** é a que recebe uma compra feita hoje (`calcularFatura(hoje)`); a fatura já fechada e ainda não vencida não aparece na lista, mas compromete o limite.
+- **Limite utilizado** = soma de todas as saídas do cartão cuja fatura ainda não venceu (vencimento ≥ hoje), inclusive as de faturas além da janela exibida. **Limite disponível** = limite − limite utilizado (pode ficar negativo se o limite foi ultrapassado).
+- Só saídas entram na fatura; entradas no cartão (estornos) não são abatidas. "Hoje" é a data no fuso de São Paulo.

@@ -4,6 +4,7 @@ import authRoutes from './auth.routes.js';
 import categoriasRoutes from './categorias.routes.js';
 import fontesDestinosRoutes from './fontesDestinos.routes.js';
 import lancamentosRoutes from './lancamentos.routes.js';
+import relatoriosRoutes from './relatorios.routes.js';
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use('/auth', authRoutes);
 router.use('/categorias', categoriasRoutes);
 router.use('/fontes-destinos', fontesDestinosRoutes);
 router.use('/lancamentos', lancamentosRoutes);
+router.use('/relatorios', relatoriosRoutes);
 
 export default router;

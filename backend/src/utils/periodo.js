@@ -12,6 +12,12 @@ export function dataValida(valor) {
   return !Number.isNaN(data.getTime()) && paraIso(data) === valor;
 }
 
+// Data de hoje (AAAA-MM-DD) no fuso de São Paulo, independente do fuso do servidor.
+export function hojeIso(agora = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: FUSO_HORARIO, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .format(agora);
+}
+
 export function mesCorrente(hoje = new Date()) {
   const [ano, mes] = new Intl.DateTimeFormat('en-CA', { timeZone: FUSO_HORARIO, year: 'numeric', month: '2-digit' })
     .format(hoje)
