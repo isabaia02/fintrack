@@ -2,7 +2,7 @@ export const ACAO_PADRAO = { rotulo: 'Novo lançamento', destino: '/lancamentos?
 
 export const PAGINAS = [
   { caminho: '/', titulo: 'Resumo', icone: 'dashboard', periodo: true },
-  { caminho: '/lancamentos', titulo: 'Lançamentos', icone: 'receipt_long', periodo: true },
+  { caminho: '/lancamentos', titulo: 'Lançamentos', icone: 'receipt_long' },
   { caminho: '/relatorios', titulo: 'Relatórios', icone: 'bar_chart', periodo: true },
   { caminho: '/faturas', titulo: 'Faturas', icone: 'credit_card' },
   { caminho: '/saude-financeira', titulo: 'Saúde financeira', icone: 'health_and_safety' },
