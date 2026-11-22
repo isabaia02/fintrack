@@ -13,6 +13,17 @@ export function formatarMoeda(valor, { comSinal = false } = {}) {
   return centavos < 0 ? `− ${numero}` : numero;
 }
 
+export function formatarPercentual(valor, casas = 1) {
+  const numero = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
+  return `${numero.format(Number(valor) || 0)}%`;
+}
+
+export function formatarVariacao(valor) {
+  const arredondado = Math.round((Number(valor) || 0) * 10) / 10;
+  if (arredondado === 0) return formatarPercentual(0, 1);
+  return `${arredondado > 0 ? '+' : '−'}${formatarPercentual(Math.abs(arredondado), 1)}`;
+}
+
 // formatarData('2026-11-18') ou Date -> "18/11/2026". Strings ISO não passam por fuso horário.
 export function formatarData(data) {
   if (!data) return '';
