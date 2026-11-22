@@ -136,7 +136,7 @@ function Formulario({ item, categorias, fontes, aoCancelar, aoSalvar }) {
     try {
       if (editando) await api.put(`/lancamentos/${item.id}`, corpo);
       else await api.post('/lancamentos', corpo);
-      aoSalvar();
+      aoSalvar(corpo);
     } catch (erro) {
       const dados = erro.response?.data;
       if (dados?.campos) setErros(dados.campos);
@@ -182,7 +182,7 @@ function Formulario({ item, categorias, fontes, aoCancelar, aoSalvar }) {
           )}
         </Campo>
 
-        <Campo label="Valor" erro={erros.valor}>
+        <Campo label="Valor" erro={erros.valor} ajuda={parcelado ? 'Valor só desta parcela; as demais não mudam.' : undefined}>
           {({ id, ...aria }) => (
             <div className="flex h-16 items-center gap-2 rounded-sm border border-border-strong bg-surface px-4 font-mono text-2xl font-medium tracking-[-0.01em] focus-within:border-2 focus-within:border-primary focus-within:px-[15px] has-aria-invalid:border-2 has-aria-invalid:border-danger has-aria-invalid:px-[15px]">
               <span className={valores.valor ? 'text-text' : 'text-text-subtle'}>R$</span>

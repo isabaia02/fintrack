@@ -24,6 +24,11 @@ function montarParametros({ inicio, fim, pagina, tipo, categoriaId, fonteDestino
 
 const chaveDaConsulta = (params, versao) => `${JSON.stringify(params)}#${versao}`;
 
+const escondidoPelosFiltros = (filtros, salvo) =>
+  (filtros.tipo !== 'todos' && filtros.tipo !== salvo.tipo)
+  || (filtros.categoriaId !== '' && filtros.categoriaId !== String(salvo.categoriaId))
+  || (filtros.fonteDestinoId !== '' && filtros.fonteDestinoId !== String(salvo.fonteDestinoId));
+
 export default function Lancamentos() {
   const [searchParams, setSearchParams] = useSearchParams();
   const periodo = usePeriodo();
@@ -96,8 +101,13 @@ export default function Lancamentos() {
 
   const fecharGaveta = () => setSearchParams({}, { replace: true });
 
-  const aoSalvar = () => {
+  const aoSalvar = (salvo) => {
     fecharGaveta();
+    if (escondidoPelosFiltros(filtros, salvo)) mudarFiltros(FILTROS_INICIAIS);
+    if (salvo.data < inicio || salvo.data > fim) {
+      const [ano, mes] = salvo.data.split('-').map(Number);
+      mudarPeriodo(ano, mes - 1);
+    }
     setVersao((v) => v + 1);
   };
 
