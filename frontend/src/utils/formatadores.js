@@ -62,3 +62,8 @@ export function formatarPercentual(valor, casas = 1) {
   });
   return `${numero}%`;
 }
+
+export function dataDeHoje() {
+  const d = new Date();
+  return [d.getFullYear(), d.getMonth() + 1, d.getDate()].map((n) => String(n).padStart(2, '0')).join('-');
+}
