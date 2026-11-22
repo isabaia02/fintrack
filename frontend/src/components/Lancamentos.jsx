@@ -29,7 +29,8 @@ export default function Lancamentos() {
   const [filtros, setFiltros] = useState(FILTROS_INICIAIS);
   const [pagina, setPagina] = useState(1);
   const [versao, setVersao] = useState(0);
-  const [opcoes, setOpcoes] = useState({ categorias: [], fontes: [] });
+  const [opcoes, setOpcoes] = useState({ categorias: [], fontes: [], erro: false });
+  const [versaoOpcoes, setVersaoOpcoes] = useState(0);
   const [resultado, setResultado] = useState({ chave: null, dados: null, erro: '' });
 
   const { inicio, fim } = periodo;
@@ -43,10 +44,11 @@ export default function Lancamentos() {
       setOpcoes({
         categorias: categorias.status === 'fulfilled' ? categorias.value.data : [],
         fontes: fontes.status === 'fulfilled' ? fontes.value.data : [],
+        erro: categorias.status === 'rejected' || fontes.status === 'rejected',
       });
     });
     return () => { ativo = false; };
-  }, []);
+  }, [versaoOpcoes]);
 
   useEffect(() => {
     let ativo = true;
@@ -109,6 +111,13 @@ export default function Lancamentos() {
         />
         {!carregando && dados && <TotaisPeriodo totais={dados.totais} />}
       </div>
+
+      {opcoes.erro && (
+        <MensagemErro
+          mensagem="Não foi possível carregar as categorias e as fontes/destinos dos filtros."
+          onTentarDeNovo={() => setVersaoOpcoes((v) => v + 1)}
+        />
+      )}
 
       {carregando && <Carregando linhas={8} />}
 

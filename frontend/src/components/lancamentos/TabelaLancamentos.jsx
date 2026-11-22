@@ -36,7 +36,7 @@ function Linha({ lancamento, aoEditar, aoExcluir }) {
         <MoneyText valor={tipo === 'saida' ? -valor : valor} />
       </td>
       <td className="pr-5 pl-2">
-        <div className="flex items-center justify-end gap-1 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
+        <div className="flex items-center justify-end gap-1 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
           <button type="button" className={acao} onClick={() => aoEditar(lancamento)} aria-label={`Editar ${descricao}`}>
             <Icone nome="edit" tamanho={18} />
           </button>
