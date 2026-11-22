@@ -7,7 +7,7 @@ import { mesCorrente } from '../src/utils/periodo.js';
 const URL_BANCO = process.env.TEST_DATABASE_URL;
 const pular = !URL_BANCO && 'defina TEST_DATABASE_URL (banco com "test" no nome) para rodar';
 
-describe('relatório por categoria (integração com Postgres)', { skip: pular }, () => {
+describe('relatórios (integração com Postgres)', { skip: pular }, () => {
   let app;
   let pool;
   let ALGORITMO_JWT;
@@ -57,19 +57,28 @@ describe('relatório por categoria (integração com Postgres)', { skip: pular }
     return {
       id: u.id,
       token,
+      conta,
+      fonte: (nome, tipo, reserva = false) => {
+        const cartao = tipo === 'cartao_credito';
+        return inserir(
+          `INSERT INTO fontes_destinos (usuario_id, nome, tipo, reserva, dia_fechamento, dia_vencimento, limite)
+           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+          [nome, tipo, reserva, cartao ? 25 : null, cartao ? 5 : null, cartao ? 5000 : null],
+        );
+      },
       categoria: (nome, tipo, cor) =>
         inserir('INSERT INTO categorias (usuario_id, nome, tipo, cor) VALUES ($1, $2, $3, $4) RETURNING id', [nome, tipo, cor]),
-      lancar: (categoriaId, tipo, valor, data) =>
+      lancar: (categoriaId, tipo, valor, data, fonteDestinoId = conta) =>
         inserir(
           `INSERT INTO lancamentos (usuario_id, tipo, descricao, valor, data, categoria_id, fonte_destino_id)
            VALUES ($1, $2, 'Teste', $3, $4, $5, $6) RETURNING id`,
-          [tipo, valor, data, categoriaId, conta],
+          [tipo, valor, data, categoriaId, fonteDestinoId],
         ),
     };
   }
 
-  const consultar = (usuario, query = '') =>
-    fetch(`${app.url}/api/relatorios/categorias${query}`, { headers: { Authorization: `Bearer ${usuario.token}` } })
+  const consultar = (usuario, query = '', rota = 'categorias') =>
+    fetch(`${app.url}/api/relatorios/${rota}${query}`, { headers: { Authorization: `Bearer ${usuario.token}` } })
       .then(async (res) => ({ status: res.status, corpo: await res.json() }));
 
   test('exige autenticação', async () => {
@@ -194,5 +203,91 @@ describe('relatório por categoria (integração com Postgres)', { skip: pular }
     const malformado = await consultar(u, '?inicio=10/2026&fim=abc');
     assert.equal(malformado.status, 400);
     assert.deepEqual(Object.keys(malformado.corpo.campos), ['inicio', 'fim']);
+  });
+
+  test('fontes-destinos: entradas por fonte, saídas por destino e saldo por conta', async () => {
+    const u = await novoUsuario();
+    const salario = await u.fonte('Salário', 'renda');
+    const poupanca = await u.fonte('Poupança', 'conta', true);
+    const nubank = await u.fonte('Nubank', 'cartao_credito');
+    const visa = await u.fonte('Visa crédito', 'cartao_credito');
+    const remuneracao = await u.categoria('Salário', 'entrada', 3);
+    const freelance = await u.categoria('Freelance', 'entrada', 7);
+    const moradia = await u.categoria('Moradia', 'saida', 1);
+    const lazer = await u.categoria('Lazer', 'saida', 4);
+
+    await u.lancar(remuneracao, 'entrada', 6800, '2026-11-05', salario);
+    await u.lancar(freelance, 'entrada', 550, '2026-11-12');
+    await u.lancar(moradia, 'saida', 1500, '2026-11-01');
+    await u.lancar(moradia, 'saida', 250, '2026-11-30');
+    await u.lancar(lazer, 'saida', 361.3, '2026-11-20', nubank);
+    await u.lancar(lazer, 'saida', 72, '2026-11-10', visa);
+    await u.lancar(lazer, 'saida', 33.34, '2026-11-15', visa);
+
+    await u.lancar(moradia, 'saida', 999, '2026-10-31');
+    await u.lancar(remuneracao, 'entrada', 999, '2026-12-01', poupanca);
+    const outro = await novoUsuario();
+    await outro.lancar(await outro.categoria('Moradia', 'saida', 1), 'saida', 999, '2026-11-10');
+
+    const res = await consultar(u, '?inicio=2026-11-01&fim=2026-11-30', 'fontes-destinos');
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.corpo, {
+      periodo: { inicio: '2026-11-01', fim: '2026-11-30' },
+      entradas: {
+        total: 7350,
+        fontes: [
+          { id: salario, nome: 'Salário', tipo: 'renda', total: 6800 },
+          { id: u.conta, nome: 'Conta corrente', tipo: 'conta', total: 550 },
+        ],
+      },
+      saidas: {
+        total: 2216.64,
+        destinos: [
+          { id: u.conta, nome: 'Conta corrente', tipo: 'conta', total: 1750 },
+          { id: nubank, nome: 'Nubank', tipo: 'cartao_credito', total: 361.3 },
+          { id: visa, nome: 'Visa crédito', tipo: 'cartao_credito', total: 105.34 },
+        ],
+      },
+      contas: [
+        { id: u.conta, nome: 'Conta corrente', reserva: false, entradas: 550, saidas: 1750, saldo: -1200 },
+        { id: poupanca, nome: 'Poupança', reserva: true, entradas: 0, saidas: 0, saldo: 0 },
+      ],
+      saldoContas: -1200,
+    });
+  });
+
+  test('fontes-destinos: sem lançamentos lista as contas zeradas', async () => {
+    const u = await novoUsuario();
+    const { status, corpo } = await consultar(u, '?inicio=2026-11-01&fim=2026-11-30', 'fontes-destinos');
+
+    assert.equal(status, 200);
+    assert.deepEqual(corpo.entradas, { total: 0, fontes: [] });
+    assert.deepEqual(corpo.saidas, { total: 0, destinos: [] });
+    assert.deepEqual(corpo.contas, [
+      { id: u.conta, nome: 'Conta corrente', reserva: false, entradas: 0, saidas: 0, saldo: 0 },
+    ]);
+    assert.equal(corpo.saldoContas, 0);
+  });
+
+  test('fontes-destinos: exige autenticação', async () => {
+    assert.equal((await fetch(`${app.url}/api/relatorios/fontes-destinos`)).status, 401);
+  });
+
+  test('fontes-destinos: sem inicio/fim usa o mês corrente', async () => {
+    const u = await novoUsuario();
+    const { corpo } = await consultar(u, '', 'fontes-destinos');
+    assert.deepEqual(corpo.periodo, mesCorrente());
+  });
+
+  test('fontes-destinos: 400 para período inválido', async () => {
+    const u = await novoUsuario();
+    const { status, corpo } = await consultar(u, '?inicio=2026-10-31&fim=2026-10-01', 'fontes-destinos');
+
+    assert.equal(status, 400);
+    assert.deepEqual(corpo, {
+      erro: 'Dados inválidos.',
+      campos: { fim: 'A data final deve ser igual ou posterior à data inicial.' },
+    });
   });
 });
