@@ -1,18 +1,11 @@
 import { MAX_PARCELAS } from '../models/parcelamento.js';
 import { idValido } from '../utils/id.js';
+import { dataValida, lerPeriodo } from '../utils/periodo.js';
 
 export const TIPOS_LANCAMENTO = ['entrada', 'saida'];
 
 const VALOR_MAXIMO = 9_999_999_999.99;
 const vazio = (v) => v === undefined || v === null || v === '';
-
-function dataValida(valor) {
-  if (typeof valor !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
-  const ano = Number(valor.slice(0, 4));
-  if (ano < 1900 || ano > 2100) return false;
-  const data = new Date(`${valor}T00:00:00Z`);
-  return !Number.isNaN(data.getTime()) && data.toISOString().slice(0, 10) === valor;
-}
 
 function erroValor(valor) {
   if (typeof valor !== 'number' || !Number.isFinite(valor) || valor <= 0) return 'O valor deve ser maior que zero.';
@@ -79,14 +72,6 @@ export function validarExclusao(req, res, next) {
   return next();
 }
 
-const iso = (data) => data.toISOString().slice(0, 10);
-
-function mesCorrente(hoje = new Date()) {
-  const ano = hoje.getFullYear();
-  const mes = hoje.getMonth();
-  return { inicio: iso(new Date(Date.UTC(ano, mes, 1))), fim: iso(new Date(Date.UTC(ano, mes + 1, 0))) };
-}
-
 function lerId(valor, campo, mensagem, campos) {
   if (vazio(valor)) return null;
   const id = idValido(valor);
@@ -97,15 +82,7 @@ function lerId(valor, campo, mensagem, campos) {
 export function validarFiltrosLancamento(req, res, next) {
   const consulta = req.query ?? {};
   const campos = {};
-  const padrao = mesCorrente();
-
-  const inicio = vazio(consulta.inicio) ? padrao.inicio : consulta.inicio;
-  const fim = vazio(consulta.fim) ? padrao.fim : consulta.fim;
-  if (!dataValida(inicio)) campos.inicio = 'Informe uma data inicial válida (AAAA-MM-DD).';
-  if (!dataValida(fim)) campos.fim = 'Informe uma data final válida (AAAA-MM-DD).';
-  if (!campos.inicio && !campos.fim && inicio > fim) {
-    campos.fim = 'A data final deve ser igual ou posterior à data inicial.';
-  }
+  const { inicio, fim } = lerPeriodo(consulta, campos);
 
   const { tipo } = consulta;
   if (!vazio(tipo) && !TIPOS_LANCAMENTO.includes(tipo)) campos.tipo = 'O tipo deve ser "entrada" ou "saida".';
