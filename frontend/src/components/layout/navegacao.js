@@ -13,7 +13,12 @@ export const PAGINAS = [
     icone: 'category',
     acao: { rotulo: 'Nova categoria', destino: '/categorias?novo=1' },
   },
-  { caminho: '/fontes-destinos', titulo: 'Fontes e destinos', icone: 'account_balance_wallet' },
+  {
+    caminho: '/fontes-destinos',
+    titulo: 'Fontes e destinos',
+    icone: 'account_balance_wallet',
+    acao: { rotulo: 'Nova fonte ou destino', destino: '/fontes-destinos?novo=1' },
+  },
 ];
 
 export const paginaDaRota = (caminho) => PAGINAS.find((p) => p.caminho === caminho);

@@ -4,11 +4,8 @@ import api from '../services/api';
 import { Carregando } from './ui/carregando';
 import { MensagemErro } from './ui/mensagem-erro';
 import { PainelCategorias } from './categorias/PainelCategorias';
-import {
-  DialogoCategoria,
-  DialogoConfirmarExclusao,
-  DialogoExclusaoBloqueada,
-} from './categorias/DialogoCategoria';
+import { DialogoCategoria } from './categorias/DialogoCategoria';
+import { DialogoConfirmarExclusao, DialogoExclusaoBloqueada } from './ui/dialogo-exclusao';
 
 export default function Categorias() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -122,12 +119,15 @@ export default function Categorias() {
         aoSalvar={aoSalvar}
       />
       <DialogoConfirmarExclusao
-        categoria={paraExcluir}
+        aberto={Boolean(paraExcluir)}
+        titulo="Excluir categoria?"
         aoCancelar={() => setParaExcluir(null)}
         aoConfirmar={confirmarExclusao}
         excluindo={excluindo}
         erro={erroExclusao}
-      />
+      >
+        A categoria <strong>{paraExcluir?.nome}</strong> será excluída. Esta ação não pode ser desfeita.
+      </DialogoConfirmarExclusao>
       <DialogoExclusaoBloqueada mensagem={bloqueio} aoFechar={() => setBloqueio('')} />
     </>
   );
