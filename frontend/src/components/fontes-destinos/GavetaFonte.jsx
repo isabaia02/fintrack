@@ -100,7 +100,7 @@ function Formulario({ item, aoCancelar, aoSalvar }) {
       </Campo>
 
       <Campo label="Nome" erro={erros.nome}>
-        <Input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={60} autoFocus />
+        <Input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={60} data-autofocus />
       </Campo>
 
       {cartao && (

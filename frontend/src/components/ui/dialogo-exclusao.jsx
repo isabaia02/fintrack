@@ -30,7 +30,7 @@ export function DialogoExclusaoBloqueada({ mensagem, aoFechar }) {
       aoFechar={aoFechar}
       titulo="Não é possível excluir"
       icone="warning"
-      acoes={<Button onClick={aoFechar} autoFocus>Entendi</Button>}
+      acoes={<Button onClick={aoFechar} data-autofocus>Entendi</Button>}
     >
       <p className="text-sm text-text-muted">{mensagem}</p>
     </Dialogo>

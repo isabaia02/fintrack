@@ -63,7 +63,7 @@ function Formulario({ categoria, aoCancelar, aoSalvar }) {
               value={nome}
               onChange={(e) => setNome(e.target.value)}
               maxLength={60}
-              autoFocus
+              data-autofocus
               placeholder="Ex.: Mercado"
             />
           </Campo>

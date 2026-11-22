@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { usePeriodo } from '../contexts/periodo';
 import { BarraFiltros } from './lancamentos/BarraFiltros';
+import { GavetaLancamento } from './lancamentos/GavetaLancamento';
 import { TabelaLancamentos } from './lancamentos/TabelaLancamentos';
 import { TotaisPeriodo } from './lancamentos/TotaisPeriodo';
 import { Carregando } from './ui/carregando';
@@ -23,8 +24,13 @@ function montarParametros({ inicio, fim, pagina, tipo, categoriaId, fonteDestino
 
 const chaveDaConsulta = (params, versao) => `${JSON.stringify(params)}#${versao}`;
 
+const escondidoPelosFiltros = (filtros, salvo) =>
+  (filtros.tipo !== 'todos' && filtros.tipo !== salvo.tipo)
+  || (filtros.categoriaId !== '' && filtros.categoriaId !== String(salvo.categoriaId))
+  || (filtros.fonteDestinoId !== '' && filtros.fonteDestinoId !== String(salvo.fonteDestinoId));
+
 export default function Lancamentos() {
-  const [, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const periodo = usePeriodo();
   const [filtros, setFiltros] = useState(FILTROS_INICIAIS);
   const [pagina, setPagina] = useState(1);
@@ -92,6 +98,21 @@ export default function Lancamentos() {
     setPagina(1);
   };
 
+  const criando = searchParams.get('novo') === '1';
+  const editandoId = searchParams.get('editar');
+
+  const fecharGaveta = () => setSearchParams({}, { replace: true });
+
+  const aoSalvar = (salvo) => {
+    fecharGaveta();
+    if (escondidoPelosFiltros(filtros, salvo)) mudarFiltros(FILTROS_INICIAIS);
+    if (salvo.data < inicio || salvo.data > fim) {
+      const [ano, mes] = salvo.data.split('-').map(Number);
+      mudarPeriodo(ano, mes - 1);
+    }
+    setVersao((v) => v + 1);
+  };
+
   const editar = (lancamento) => setSearchParams({ editar: String(lancamento.id) });
   const excluir = (lancamento) => setSearchParams({ excluir: String(lancamento.id) });
 
@@ -148,6 +169,17 @@ export default function Lancamentos() {
               onChange={setPagina}
             />
           )}
+        />
+      )}
+
+      {(criando || editandoId) && (
+        <GavetaLancamento
+          key={editandoId ?? 'novo'}
+          id={editandoId}
+          categorias={opcoes.categorias}
+          fontes={opcoes.fontes}
+          aoCancelar={fecharGaveta}
+          aoSalvar={aoSalvar}
         />
       )}
     </div>
