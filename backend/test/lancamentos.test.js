@@ -2,6 +2,7 @@ import { describe, test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import jwt from 'jsonwebtoken';
 import { subirApp } from './helpers.js';
+import { mesCorrente } from '../src/utils/periodo.js';
 
 const URL_BANCO = process.env.TEST_DATABASE_URL;
 const pular = !URL_BANCO && 'defina TEST_DATABASE_URL (banco com "test" no nome) para rodar';
@@ -388,10 +389,10 @@ describe('lançamentos (integração com Postgres)', { skip: pular }, () => {
 
   test('sem datas usa o mês corrente', async () => {
     const u = await novoUsuario();
-    const hoje = new Date();
-    const dia = (d) => new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth(), d)).toISOString().slice(0, 10);
-    await lancar(u, { descricao: 'Neste mês', data: dia(1), fonteDestinoId: u.conta });
-    await lancar(u, { descricao: 'Mês passado', data: dia(0), fonteDestinoId: u.conta });
+    const { inicio } = mesCorrente();
+    const vespera = new Date(Date.parse(`${inicio}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+    await lancar(u, { descricao: 'Neste mês', data: inicio, fonteDestinoId: u.conta });
+    await lancar(u, { descricao: 'Mês passado', data: vespera, fonteDestinoId: u.conta });
 
     const res = await listar(u);
     assert.equal(res.status, 200);
