@@ -66,3 +66,4 @@ Regras de fontes e destinos: o nome é único por usuário **e tipo** (uma conta
 - Componentes base em `frontend/src/components/ui`: `Button`, `Badge`, `Input`, `Select`, `Segmentado` e `MoneyText`.
 - Ícones: Material Icons (Outlined) com `<Icone nome="add" />`, usando o nome do ícone do Figma.
 - Foco inicial em `Gaveta` e `Dialogo`: marque o campo com `data-autofocus` (não `autoFocus`). O `autoFocus` do React roda antes de o `<dialog>` abrir e o foco acaba no botão "Fechar".
+- Fechamento de `Gaveta` e `Dialogo` (`useDialogoNativo`): Esc e clique fora não fecham o `<dialog>` direto; chamam `aoFechar` e quem usa o componente decide (ex.: a gaveta de lançamento pergunta "Descartar alterações?"). Se o navegador fechar mesmo assim (alguns ignoram o cancelamento no Esc repetido), o diálogo é reaberto e `aoFechar` é chamado, para o estado do React e o do DOM não se desencontrarem. Com `bloqueada`, nada fecha.
