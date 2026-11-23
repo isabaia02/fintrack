@@ -7,7 +7,6 @@ import {
 } from '../middlewares/validarCategoria.js';
 import * as Categoria from '../models/categoria.js';
 import { exigirIdValido } from '../middlewares/validarId.js';
-import { idValido } from '../utils/id.js';
 
 const router = Router();
 router.use(autenticar);
@@ -40,10 +39,8 @@ router.post('/', validarCriacaoCategoria, async (req, res, next) => {
 });
 
 router.put('/:id', exigirIdValido(NAO_ENCONTRADA), validarEdicaoCategoria, async (req, res, next) => {
-  const id = idValido(req.params.id);
-  if (!id) return res.status(404).json(NAO_ENCONTRADA);
   try {
-    const resultado = await Categoria.atualizar(req.usuarioId, id, req.dadosCategoria);
+    const resultado = await Categoria.atualizar(req.usuarioId, req.idRecurso, req.dadosCategoria);
     if (resultado.naoEncontrada) return res.status(404).json(NAO_ENCONTRADA);
     if (resultado.tipoBloqueado) {
       return res.status(409).json({
@@ -58,11 +55,9 @@ router.put('/:id', exigirIdValido(NAO_ENCONTRADA), validarEdicaoCategoria, async
   }
 });
 
-router.delete('/:id', async (req, res, next) => {
-  const id = idValido(req.params.id);
-  if (!id) return res.status(404).json(NAO_ENCONTRADA);
+router.delete('/:id', exigirIdValido(NAO_ENCONTRADA), async (req, res, next) => {
   try {
-    const resultado = await Categoria.excluir(req.usuarioId, id);
+    const resultado = await Categoria.excluir(req.usuarioId, req.idRecurso);
     if (resultado.naoEncontrada) return res.status(404).json(NAO_ENCONTRADA);
     if (resultado.bloqueadaPor) {
       return res.status(409).json({

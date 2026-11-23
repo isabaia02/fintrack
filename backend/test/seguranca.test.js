@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { lerOrigens, validarAmbiente } from '../src/config/ambiente.js';
+import { lerOrigens, lerTrustProxy, validarAmbiente } from '../src/config/ambiente.js';
+import { criarApp } from '../src/app.js';
 import { limparTexto, temControle } from '../src/utils/texto.js';
 
 // Checklist de segurança (BE-10) que não precisa de banco. O que depende do Postgres está em
@@ -115,6 +116,18 @@ describe('sanitização de texto', () => {
     assert.equal(limparTexto({ nome: 'x' }), '');
   });
 
+  test('tab e quebras de linha viram espaço, sem grudar as palavras', () => {
+    assert.equal(limparTexto('Mercado\tCentral'), 'Mercado Central');
+    assert.equal(limparTexto('Linha 1\r\nLinha 2'), 'Linha 1 Linha 2');
+    assert.equal(limparTexto('a \t  b'), 'a b');
+  });
+
+  test('remove controles de direção do Unicode e controles C1 (spoofing de exibição)', () => {
+    assert.equal(limparTexto('Conta\u202Etxt.exe'), 'Contatxt.exe');
+    assert.equal(limparTexto('a\u2066b\u2069c'), 'abc');
+    assert.equal(limparTexto('a\u0085b\u009fc'), 'abc');
+  });
+
   test('não altera HTML/aspas (a API só devolve JSON; quem exibe escapa)', () => {
     assert.equal(limparTexto(`<b>"x"</b> & 'y'`), `<b>"x"</b> & 'y'`);
   });
@@ -122,6 +135,8 @@ describe('sanitização de texto', () => {
   test('temControle detecta NUL e DEL', () => {
     assert.equal(temControle('a\u0000b'), true);
     assert.equal(temControle('a\u007fb'), true);
+    assert.equal(temControle('a\u202Eb'), true);
+    assert.equal(temControle('a\u0085b'), true);
     assert.equal(temControle('ação'), false);
   });
 });
@@ -147,6 +162,33 @@ describe('configuração do ambiente (.env)', () => {
     assert.deepEqual(lerOrigens(undefined), ['http://localhost:5173']);
     assert.throws(() => lerOrigens('*'), /não pode ser "\*"/);
     assert.throws(() => lerOrigens('http://a.com,*'), /não pode ser "\*"/);
+  });
+
+  test('TRUST_PROXY: true/false, número de proxies ou lista; vazio não liga nada', () => {
+    assert.equal(lerTrustProxy(undefined), undefined);
+    assert.equal(lerTrustProxy('  '), undefined);
+    assert.equal(lerTrustProxy('true'), true);
+    assert.equal(lerTrustProxy('TRUE'), true);
+    assert.equal(lerTrustProxy('false'), false);
+    assert.equal(lerTrustProxy('1'), 1);
+    assert.equal(lerTrustProxy('0'), 0);
+    assert.equal(lerTrustProxy('loopback'), 'loopback');
+    assert.equal(lerTrustProxy('10.0.0.0/8, 127.0.0.1'), '10.0.0.0/8, 127.0.0.1');
+  });
+
+  test('TRUST_PROXY=true não derruba a subida e gera aviso; o app aceita cada forma', () => {
+    const base = { DATABASE_URL: 'postgres://x', JWT_SECRET: 'a'.repeat(40) };
+    const { trustProxy, avisos } = validarAmbiente({ ...base, TRUST_PROXY: 'true' });
+    assert.equal(trustProxy, true);
+    assert.equal(avisos.length, 1);
+    assert.match(avisos[0], /número de proxies/);
+    assert.deepEqual(validarAmbiente({ ...base, TRUST_PROXY: '1' }).avisos, []);
+
+    const origens = ['http://localhost:5173'];
+    for (const valor of [true, false, 0, 1, 'loopback', undefined]) {
+      const app = criarApp({ origens, trustProxy: valor });
+      if (valor !== undefined) assert.equal(app.get('trust proxy'), valor);
+    }
     assert.throws(() => lerOrigens('', true), /obrigatório em produção/);
   });
 });

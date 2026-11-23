@@ -6,12 +6,12 @@ import { naoEncontrado, tratarErros } from './middlewares/erros.js';
 
 const LIMITE_CORPO = '100kb';
 
-export function criarApp({ origens }) {
+export function criarApp({ origens, trustProxy }) {
   const app = express();
 
   app.disable('x-powered-by');
 
-  if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
+  if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
 
   app.use(cabecalhosSeguranca);
   app.use(cors({

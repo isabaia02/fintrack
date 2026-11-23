@@ -11,6 +11,15 @@ export function lerOrigens(valor, producao = false) {
   return origens;
 }
 
+export function lerTrustProxy(valor) {
+  const texto = valor?.trim();
+  if (!texto) return undefined;
+  if (texto.toLowerCase() === 'true') return true;
+  if (texto.toLowerCase() === 'false') return false;
+  if (/^\d+$/.test(texto)) return Number(texto);
+  return texto;
+}
+
 export function validarAmbiente(env = process.env) {
   const producao = env.NODE_ENV === 'production';
   const avisos = [];
@@ -26,5 +35,10 @@ export function validarAmbiente(env = process.env) {
   }
 
   const origens = lerOrigens(env.CORS_ORIGIN, producao);
-  return { origens, avisos };
+
+  const trustProxy = lerTrustProxy(env.TRUST_PROXY);
+  if (trustProxy === true) {
+    avisos.push('TRUST_PROXY=true confia em qualquer X-Forwarded-For: o cliente consegue forjar o IP e escapar do rate limit. Prefira o número de proxies à frente do servidor (ex.: TRUST_PROXY=1).');
+  }
+  return { origens, avisos, trustProxy };
 }
