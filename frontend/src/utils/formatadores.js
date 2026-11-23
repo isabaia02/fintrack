@@ -13,6 +13,12 @@ export function formatarMoeda(valor, { comSinal = false } = {}) {
   return centavos < 0 ? `− ${numero}` : numero;
 }
 
+export function formatarVariacao(valor) {
+  const arredondado = Math.round((Number(valor) || 0) * 10) / 10;
+  if (arredondado === 0) return formatarPercentual(0, 1);
+  return `${arredondado > 0 ? '+' : '−'}${formatarPercentual(Math.abs(arredondado), 1)}`;
+}
+
 // formatarData('2026-11-18') ou Date -> "18/11/2026". Strings ISO não passam por fuso horário.
 export function formatarData(data) {
   if (!data) return '';
@@ -53,4 +59,17 @@ export function valorDaMascara(texto) {
 export function rotuloMes(ano, mes) {
   const nome = new Date(Date.UTC(ano, mes, 1)).toLocaleDateString('pt-BR', { month: 'long', timeZone: 'UTC' });
   return `${nome.charAt(0).toUpperCase()}${nome.slice(1)} ${ano}`;
+}
+
+export function formatarPercentual(valor, casas = 1) {
+  const numero = (Number(valor) || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: casas,
+    maximumFractionDigits: casas,
+  });
+  return `${numero}%`;
+}
+
+export function dataDeHoje() {
+  const d = new Date();
+  return [d.getFullYear(), d.getMonth() + 1, d.getDate()].map((n) => String(n).padStart(2, '0')).join('-');
 }
