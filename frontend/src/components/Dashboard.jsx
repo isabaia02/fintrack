@@ -37,24 +37,29 @@ async function consultarHistorico() {
   }
 }
 
+// 404/501: rota ainda não publicada no backend. O bloco mostra "—" sem acusar erro.
+const STATUS_ROTA_AUSENTE = [404, 501];
+
 const semConexao = (resultado) => resultado.status === 'rejected' && !resultado.reason?.response;
+const rotaAusente = (resultado) => resultado.status === 'rejected'
+  && STATUS_ROTA_AUSENTE.includes(resultado.reason?.response?.status);
 
 async function carregarResumo(periodo, historico) {
-  const resultados = await Promise.allSettled([
-    api.get('/lancamentos', { params: periodo }),
-    api.get('/relatorios/categorias', { params: periodo }),
-    api.get('/relatorios/fontes-destinos', { params: periodo }),
-    api.get('/relatorios/faturas', { params: { meses: MESES_FATURAS } }),
-  ]);
-  const [lancamentos, categorias, fontes, faturas] = resultados;
-
-  const resumo = {
-    lancamentos: lerResultado(lancamentos, (d) => d),
-    categorias: lerResultado(categorias, (d) => d.saidas?.categorias),
-    contas: lerResultado(fontes, (d) => d.contas),
-    cartoes: lerResultado(faturas, (d) => d.cartoes),
+  const blocos = {
+    lancamentos: [api.get('/lancamentos', { params: periodo }), (d) => d],
+    categorias: [api.get('/relatorios/categorias', { params: periodo }), (d) => d.saidas?.categorias],
+    contas: [api.get('/relatorios/fontes-destinos', { params: periodo }), (d) => d.contas],
+    cartoes: [api.get('/relatorios/faturas', { params: { meses: MESES_FATURAS } }), (d) => d.cartoes],
   };
-  resumo.offline = resultados.some(semConexao);
+  const nomes = Object.keys(blocos);
+  const resultados = await Promise.allSettled(nomes.map((nome) => blocos[nome][0]));
+
+  const resumo = { offline: resultados.some(semConexao), falhou: false };
+  resultados.forEach((resultado, i) => {
+    const nome = nomes[i];
+    resumo[nome] = lerResultado(resultado, blocos[nome][1]);
+    if (resumo[nome] === null && !rotaAusente(resultado)) resumo.falhou = true;
+  });
   const totalDoMes = resumo.lancamentos?.total;
   if (totalDoMes > 0) resumo.historico = true;
   else if (totalDoMes === 0) resumo.historico = historico ?? await consultarHistorico();
@@ -92,7 +97,7 @@ export default function Dashboard() {
 
   if (carregando) return <EsqueletoResumo />;
 
-  const { lancamentos, categorias, contas, cartoes, primeiroUso, offline } = estado.resumo;
+  const { lancamentos, categorias, contas, cartoes, primeiroUso, offline, falhou } = estado.resumo;
   const novoLancamento = () => navigate(ACAO_PADRAO.destino);
 
   if (primeiroUso) {
@@ -104,7 +109,6 @@ export default function Dashboard() {
     );
   }
 
-  const falhou = !lancamentos || offline;
   const hoje = dataDeHoje();
   const recentes = noMesAtual ? lancamentos?.itens.filter((l) => l.data <= hoje) : lancamentos?.itens;
 
@@ -113,7 +117,7 @@ export default function Dashboard() {
       {falhou && (
         <BannerErro
           titulo="Não foi possível carregar o resumo."
-          detalhe="Verifique sua conexão e tente de novo."
+          detalhe={offline ? 'Verifique sua conexão e tente de novo.' : 'Algumas informações não carregaram. Tente de novo.'}
           onTentarDeNovo={() => setVersao((v) => v + 1)}
         />
       )}
