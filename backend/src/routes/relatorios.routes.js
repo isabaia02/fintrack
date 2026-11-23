@@ -14,4 +14,12 @@ router.get('/categorias', validarPeriodo, async (req, res, next) => {
   }
 });
 
+router.get('/fontes-destinos', validarPeriodo, async (req, res, next) => {
+  try {
+    res.json(await Relatorio.porFonteDestino(req.usuarioId, req.periodo));
+  } catch (erro) {
+    next(erro);
+  }
+});
+
 export default router;
