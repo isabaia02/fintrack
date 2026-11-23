@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { usePeriodo } from '../contexts/periodo';
 import { BarraFiltros } from './lancamentos/BarraFiltros';
@@ -32,6 +32,7 @@ const escondidoPelosFiltros = (filtros, salvo) =>
 
 export default function Lancamentos() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { mostrarErro } = useOutletContext();
   const periodo = usePeriodo();
   const [filtros, setFiltros] = useState(FILTROS_INICIAIS);
   const [pagina, setPagina] = useState(1);
@@ -69,10 +70,10 @@ export default function Lancamentos() {
         else setResultado({ chave: chaveAtual, dados: data, erro: '' });
       })
       .catch((e) => {
-        if (ativo) setResultado({ chave: chaveAtual, dados: null, erro: e.response?.data?.erro ?? 'Não foi possível carregar os lançamentos.' });
+        if (ativo && !mostrarErro(e)) setResultado({ chave: chaveAtual, dados: null, erro: e.response?.data?.erro ?? 'Não foi possível carregar os lançamentos.' });
       });
     return () => { ativo = false; };
-  }, [inicio, fim, pagina, filtros, versao]);
+  }, [inicio, fim, pagina, filtros, versao, mostrarErro]);
 
   const comFiltros = !periodo.noMesAtual
     || filtros.tipo !== FILTROS_INICIAIS.tipo

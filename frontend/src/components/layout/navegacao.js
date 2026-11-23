@@ -5,7 +5,7 @@ export const PAGINAS = [
   { caminho: '/lancamentos', titulo: 'Lançamentos', icone: 'receipt_long' },
   { caminho: '/relatorios', titulo: 'Relatórios', icone: 'bar_chart', acao: null },
   { caminho: '/faturas', titulo: 'Faturas', icone: 'credit_card', acao: null },
-  { caminho: '/saude-financeira', titulo: 'Saúde financeira', icone: 'health_and_safety' },
+  { caminho: '/saude-financeira', titulo: 'Saúde financeira', icone: 'health_and_safety', acao: null },
   { divisor: true },
   {
     caminho: '/categorias',
@@ -21,4 +21,6 @@ export const PAGINAS = [
   },
 ];
 
-export const paginaDaRota = (caminho) => PAGINAS.find((p) => p.caminho === caminho);
+const semBarraFinal = (caminho) => caminho.replace(/(.)\/+$/, '$1');
+
+export const paginaDaRota = (caminho) => PAGINAS.find((p) => p.caminho === semBarraFinal(caminho));

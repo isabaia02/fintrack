@@ -1,8 +1,7 @@
+import { BarraLimite } from '../ui/barra-limite';
 import { MoneyText } from '../ui/money-text';
 import { formatarData, formatarMoeda, formatarPercentual } from '../../utils/formatadores';
 import { Secao } from './Secao';
-
-const LIMITE_ALERTA = 80;
 
 const diaMes = (data) => formatarData(data).slice(0, 5);
 
@@ -12,19 +11,7 @@ function MedidorLimite({ cartao }) {
 
   return (
     <>
-      <div
-        role="meter"
-        aria-label={`Limite usado de ${nome}`}
-        aria-valuemin={0}
-        aria-valuemax={limite}
-        aria-valuenow={Math.min(utilizado, limite)}
-        className="h-1.5 w-[380px] max-w-full overflow-hidden rounded-[3px] bg-surface-sunken"
-      >
-        <div
-          className={`h-full rounded-[3px] ${uso > LIMITE_ALERTA ? 'bg-warning' : 'bg-primary'}`}
-          style={{ width: `${Math.min(uso, 100)}%` }}
-        />
-      </div>
+      <BarraLimite nome={nome} utilizado={utilizado} limite={limite} className="w-[380px] max-w-full" />
       <div className="flex justify-between gap-4 text-xs text-text-muted">
         <p>Usado {formatarMoeda(utilizado)}</p>
         <p>{formatarPercentual(uso, 0)} de {formatarMoeda(limite)}</p>

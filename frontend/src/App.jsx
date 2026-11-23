@@ -29,9 +29,9 @@ export default function App() {
               <Route path="/relatorios" element={<Relatorios />} />
               <Route path="/faturas" element={<Faturas />} />
               <Route path="/saude-financeira" element={<SaudeFinanceira />} />
+              <Route path="*" element={<NaoEncontrado />} />
             </Route>
           </Route>
-          <Route path="*" element={<NaoEncontrado />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
