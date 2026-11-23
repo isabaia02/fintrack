@@ -3,6 +3,8 @@ import { formatarMoeda } from '../../utils/formatadores';
 import { mesPorExtenso, rotuloMesAno, rotuloMesCurto } from '../../utils/saudeFinanceira';
 import { Aviso } from '../ui/aviso';
 
+// O gráfico é desenhado em px do viewBox e limitado a essa largura (max-w no <svg>): em telas largas ele
+// não cresce e o texto e os traços ficam com o tamanho do protótipo (texto de 12px, linha de 2px).
 const LARGURA = 392;
 const ALTURA = 192;
 const X_MIN = 24;
@@ -36,7 +38,7 @@ function Grafico({ serie }) {
   const yZero = y(0);
 
   return (
-    <svg viewBox={`0 0 ${LARGURA} ${ALTURA}`} className="h-auto w-full" aria-hidden="true">
+    <svg viewBox={`0 0 ${LARGURA} ${ALTURA}`} className="mx-auto h-auto w-full max-w-[392px]" aria-hidden="true">
       {[Y_TOPO, (Y_TOPO + Y_BASE) / 2].map((gy) => (
         <line key={gy} x1="0" x2={LARGURA} y1={gy} y2={gy} className="stroke-border" strokeWidth="1" />
       ))}

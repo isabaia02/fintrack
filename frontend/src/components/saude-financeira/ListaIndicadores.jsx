@@ -7,11 +7,13 @@ function Indicador({ indicador }) {
 
   return (
     <li className="flex min-h-22 items-center gap-4 px-5 py-3">
-      <p
-        className="w-28 shrink-0 font-mono text-2xl leading-8 font-medium tracking-[-0.01em] sm:w-36"
-        aria-label={indicador.valor === null ? 'Sem dados' : undefined}
-      >
-        {valor}
+      <p className="w-28 shrink-0 font-mono text-2xl leading-8 font-medium tracking-[-0.01em] sm:w-36">
+        {indicador.valor === null ? (
+          <>
+            <span aria-hidden="true">{valor}</span>
+            <span className="sr-only">Sem dados</span>
+          </>
+        ) : valor}
       </p>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <h3 className="text-sm leading-5 font-medium">{indicador.titulo}</h3>
