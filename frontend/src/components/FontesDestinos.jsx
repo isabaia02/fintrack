@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { GavetaFonte } from './fontes-destinos/GavetaFonte';
 import { GrupoFontes } from './fontes-destinos/GrupoFontes';
@@ -10,6 +10,7 @@ import { MensagemErro } from './ui/mensagem-erro';
 
 export default function FontesDestinos() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { mostrarErro } = useOutletContext();
   const [itens, setItens] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
@@ -34,13 +35,13 @@ export default function FontesDestinos() {
         setErro('');
       })
       .catch((e) => {
-        if (ativo) setErro(e.response?.data?.erro ?? 'Não foi possível carregar as fontes e destinos.');
+        if (ativo && !mostrarErro(e)) setErro(e.response?.data?.erro ?? 'Não foi possível carregar as fontes e destinos.');
       })
       .finally(() => {
         if (ativo) setCarregando(false);
       });
     return () => { ativo = false; };
-  }, [versao]);
+  }, [versao, mostrarErro]);
 
   const fecharGaveta = () => {
     setEditando(null);

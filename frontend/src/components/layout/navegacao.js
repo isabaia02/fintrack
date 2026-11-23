@@ -21,4 +21,6 @@ export const PAGINAS = [
   },
 ];
 
-export const paginaDaRota = (caminho) => PAGINAS.find((p) => p.caminho === caminho);
+const semBarraFinal = (caminho) => caminho.replace(/(.)\/+$/, '$1');
+
+export const paginaDaRota = (caminho) => PAGINAS.find((p) => p.caminho === semBarraFinal(caminho));

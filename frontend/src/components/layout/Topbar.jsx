@@ -16,7 +16,7 @@ export default function Topbar({ acaoBloqueada = false }) {
       <div className="flex items-center gap-4">
         {pagina?.periodo && <SeletorPeriodo />}
         {acao && (
-          <Button onClick={() => navigate(acao.destino)}>
+          <Button disabled={acaoBloqueada} onClick={() => navigate(acao.destino)}>
             <Icone nome="add" tamanho={18} />
             {acao.rotulo}
           </Button>
