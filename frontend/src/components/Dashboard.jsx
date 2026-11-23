@@ -14,19 +14,11 @@ import { SaldoPorConta } from './dashboard/SaldoPorConta';
 import { Secao } from './dashboard/Secao';
 import { UltimosLancamentos } from './dashboard/UltimosLancamentos';
 import { BannerErro } from './ui/banner-erro';
+import { lerResultado } from '../utils/resultados';
 
 const QUANTIDADE_ULTIMOS = 4;
 const MESES_FATURAS = 3;
 const TODO_O_HISTORICO = { inicio: '1900-01-01', fim: '2100-12-31' };
-
-function lerResultado(resultado, ler) {
-  if (resultado.status !== 'fulfilled') return null;
-  try {
-    return ler(resultado.value.data) ?? null;
-  } catch {
-    return null;
-  }
-}
 
 async function consultarHistorico() {
   try {
