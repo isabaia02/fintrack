@@ -1,4 +1,4 @@
-# FinTrack — controle financeiro pessoal
+# FinTrack, controle financeiro pessoal
 
 Projeto da disciplina **ES47B - Programação Web Fullstack**: API REST (Node.js/Express + PostgreSQL) e SPA (React + Vite).
 
@@ -7,7 +7,7 @@ Projeto da disciplina **ES47B - Programação Web Fullstack**: API REST (Node.js
 | Isadora Costa Baia | 2614685 |
 | Pedro Henrique Zanatta de Oliveira | 2601443 |
 
-Design: [Figma](https://www.figma.com/design/kiJuYs1GQALZBR62vMNZVw/Untitled) (somente desktop, 1440 px).
+Design: [Figma](https://www.figma.com/design/kiJuYs1GQALZBR62vMNZVw/Untitled).
 
 ## Tecnologias
 - **Back-end:** Node.js, Express 5, pg, bcrypt, jsonwebtoken, cors, dotenv e express-rate-limit. Testes com `node:test`.
