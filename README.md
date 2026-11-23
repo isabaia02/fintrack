@@ -2,47 +2,79 @@
 
 Projeto 2 de Desenvolvimento Web Full Stack: API REST (Node.js/Express + PostgreSQL) e SPA (React + Vite).
 
+Design (Figma): [FinTrack](https://www.figma.com/design/kiJuYs1GQALZBR62vMNZVw/Untitled). As telas são só para desktop, a partir de 1440 px.
+
 ## Tecnologias
-- **Back-end:** Node.js 20+, Express, pg (PostgreSQL, com pool), bcrypt, jsonwebtoken, cors, dotenv, express-rate-limit
-- **Front-end:** React, Vite, React Router, Axios, Recharts, Tailwind CSS v4, Material Icons (Outlined)
-- **Banco:** PostgreSQL
+- **Back-end:** Node.js, Express 5, pg (PostgreSQL, com pool), bcrypt, jsonwebtoken, cors, dotenv e express-rate-limit. Testes com `node:test`.
+- **Front-end:** React 19, Vite 8, React Router 7, Axios, Recharts 3, Tailwind CSS 4 e Material Icons (Outlined). Lint com oxlint.
+- **Banco:** PostgreSQL (testado na versão 16).
 
 ## Estrutura
 ```
 backend/
-  database/    schema.sql, run-schema.js, seed.js, demonstracao.js (dados do seed)
+  database/      schema.sql, run-schema.js, seed.js, demonstracao.js (dados do seed)
   src/
-    server.js
-    routes/        rotas + controladores
-    models/        acesso ao banco e regras (cpf.js, faturas.js, parcelamento.js)
-    middlewares/   autenticar.js (JWT), limitarLogin.js, erros.js e as validações (validarCadastro.js, validarLogin.js,
-                   validarCategoria.js, validarFonteDestino.js, validarLancamento.js)
-    config/        db.js (pool), jwt.js
+    server.js      sobe a API (lê e valida o .env)
+    app.js         monta o Express (CORS, cabeçalhos de segurança, rotas e erros)
+    routes/        rotas e controladores
+    models/        acesso ao banco e regras (faturas, parcelamento, relatórios, saúde financeira)
+    middlewares/   autenticação (JWT), limites de tentativas, validações e tratamento de erros
+    config/        ambiente.js, db.js (pool), jwt.js, senha.js
+    services/      iaDicas.js (dicas opcionais por IA)
+    utils/         datas, ids e textos
+  test/          testes unitários e de integração
 frontend/src/
-  components/  páginas e componentes (ui/ = componentes base do design system)
-  contexts/    AuthContext
-  services/    api.js (único cliente HTTP)
+  components/    páginas e componentes (ui/ = componentes base do design system)
+  contexts/      AuthContext
+  hooks/         useApi
+  services/      api.js (único cliente HTTP)
+  utils/         formatadores e cálculos de exibição
+docs/
+  roteiro-seguranca.http   roteiro de requisições para a apresentação
 ```
-Utilitários puros (`cpfValido`, `calcularFatura`, `dividirEmParcelas`, `somarMeses`) ficam em `backend/src/models/`.
+As funções puras de regra (`cpfValido`, `calcularFatura`, `dividirEmParcelas`, `somarMeses`) ficam em `backend/src/models/`.
 
 ## Como rodar
-1. Crie o banco: `createdb fintrack`
-2. Back-end:
+**Pré-requisitos:** Node.js 20.19+ (ou 22.12+, exigido pelo Vite) e PostgreSQL. Os comandos abaixo partem da raiz do repositório.
+
+1. **Banco de dados.** Escolha uma opção:
+   - Com Docker, que já cria o banco `fintrack` com o usuário e a senha do `.env.example`:
+     ```bash
+     docker run --name fintrack-db -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=fintrack -p 5432:5432 -d postgres:16
+     ```
+   - Com o PostgreSQL instalado na máquina: `createdb -h localhost -U postgres fintrack`.
+2. **Back-end:**
    ```bash
    cd backend
-   cp .env.example .env      # ajuste DATABASE_URL e JWT_SECRET
+   cp .env.example .env
    npm install
-   npm run db:schema         # cria as tabelas
+   npm run db:schema         # cria as tabelas (apaga as existentes)
    npm run db:seed           # usuários de demonstração (ver "Seed de demonstração")
    npm run dev               # http://localhost:3000
    ```
-3. Front-end:
+   No `.env`, confira o `DATABASE_URL` e troque o `JWT_SECRET` por um valor aleatório de pelo menos 32 caracteres. Para gerar um: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`. Com o valor do exemplo, a API sobe com um aviso em desenvolvimento e não sobe com `NODE_ENV=production`.
+3. **Front-end** (em outro terminal, também a partir da raiz):
    ```bash
    cd frontend
    cp .env.example .env
    npm install
    npm run dev               # http://localhost:5173
    ```
+4. Abra http://localhost:5173 e entre com `ana@email.com` / `senha1234`.
+
+### Variáveis de ambiente
+| Arquivo | Variável | Para que serve | Padrão no exemplo |
+|---|---|---|---|
+| `backend/.env` | `PORT` | porta da API | `3000` |
+| | `DATABASE_URL` | conexão com o PostgreSQL (obrigatória) | `postgresql://postgres:postgres@localhost:5432/fintrack` |
+| | `JWT_SECRET` | assinatura dos tokens (obrigatória, 32+ caracteres) | valor de exemplo, troque |
+| | `JWT_EXPIRES_IN` | validade do token | `1h` |
+| | `CORS_ORIGIN` | origens do front permitidas, separadas por vírgula (obrigatória em produção) | `http://localhost:5173` |
+| | `LOGIN_RATE_LIMIT_MAX` | logins que falham por IP a cada 15 min | `10` |
+| | `CADASTRO_RATE_LIMIT_MAX` | cadastros por IP por hora | `20` |
+| | `TRUST_PROXY` | número de proxies à frente da API, para o limite ver o IP real (opcional) | desligado |
+| | `ANTHROPIC_API_KEY`, `IA_MODELO` | dicas extras por IA na Saúde financeira (opcional) | desligado |
+| `frontend/.env` | `VITE_API_URL` | endereço da API usado pelo front | `http://localhost:3000/api` |
 
 Usuários do seed: `ana@email.com` e `bruno@email.com` (senha `senha1234`).
 
@@ -73,14 +105,45 @@ O login com senha errada conta para o limite de tentativas (10 em 15 min por IP)
 cd backend
 npm test                                  # testes unitários (sem banco)
 
-# + testes de integração (categorias, fontes-destinos e lançamentos): precisam de um banco de teste exclusivo,
+# + testes de integração (rotas, relatórios, segurança e seed): precisam de um banco de teste exclusivo,
 # cujo schema é recriado a cada execução (o nome do banco deve conter "test")
-createdb fintrack_test
-TEST_DATABASE_URL=postgresql://localhost:5432/fintrack_test npm test
+createdb -h localhost -U postgres fintrack_test   # com Docker: docker exec fintrack-db createdb -U postgres fintrack_test
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/fintrack_test npm test
+```
+
+### Verificação do front-end
+```bash
+cd frontend
+npm run lint
+npm run build
 ```
 
 ## Rotas
-Implementadas até agora: `GET /api/health`, `POST /api/auth/cadastro`, `POST /api/auth/login` (limite de tentativas; ajustável por `LOGIN_RATE_LIMIT_MAX`) e `GET /api/auth/me` (requer `Authorization: Bearer <token>`), além do CRUD de `/api/categorias` e de `/api/fontes-destinos` (`GET`/`POST` e `PUT`/`DELETE` em `/:id`, todos autenticados) e de `/api/lancamentos` (`GET`/`POST`, `GET`/`PUT`/`PATCH` em `/:id` e `DELETE /:id[?todasParcelas=true]`), `GET /api/saude-financeira`, e os relatórios `GET /api/relatorios/categorias`, `GET /api/relatorios/faturas` e `GET /api/relatorios/fontes-destinos`.
+Todas ficam sob `/api` e respondem JSON. As marcadas com 🔒 exigem `Authorization: Bearer <token>`. Erros seguem o padrão `{ erro, campos? }` (ver "Segurança"), e recurso de outro usuário devolve `404`, igual a um id que não existe.
+
+| Método | Rota | 🔒 | O que faz |
+|---|---|---|---|
+| `GET` | `/health` | | verifica a API e a conexão com o banco |
+| `POST` | `/auth/cadastro` | | cria a conta com categorias padrão e uma conta corrente (`201`; `409` com e-mail ou CPF já usados; limite de cadastros por IP) |
+| `POST` | `/auth/login` | | devolve `{ token, usuario }` (`401` com credenciais inválidas; `429` depois de muitas tentativas que falham) |
+| `GET` | `/auth/me` | 🔒 | dados do usuário logado |
+| `GET` | `/categorias?tipo=entrada\|saida` | 🔒 | lista as categorias, com o total de lançamentos de cada uma |
+| `POST` | `/categorias` | 🔒 | cria uma categoria (nome único por usuário e tipo) |
+| `PUT` | `/categorias/:id` | 🔒 | edita (`409` ao mudar o tipo de uma categoria com lançamentos) |
+| `DELETE` | `/categorias/:id` | 🔒 | exclui (`409` se tiver lançamentos) |
+| `GET` | `/fontes-destinos?tipo=renda\|conta\|cartao_credito` | 🔒 | lista rendas, contas e cartões |
+| `POST` | `/fontes-destinos` | 🔒 | cria (cartão exige dia de fechamento, dia de vencimento e limite) |
+| `PUT` | `/fontes-destinos/:id` | 🔒 | edita (ver "Regras de fontes e destinos") |
+| `DELETE` | `/fontes-destinos/:id` | 🔒 | exclui (`409` se tiver lançamentos) |
+| `GET` | `/lancamentos` | 🔒 | lista com filtros, paginação e totais (ver "Listagem de lançamentos") |
+| `GET` | `/lancamentos/:id` | 🔒 | um lançamento |
+| `POST` | `/lancamentos` | 🔒 | cria, com `parcelas` opcional no cartão (ver "Lançamentos e parcelamento") |
+| `PUT` / `PATCH` | `/lancamentos/:id` | 🔒 | edita por completo ou em parte |
+| `DELETE` | `/lancamentos/:id[?todasParcelas=true]` | 🔒 | exclui o lançamento ou a compra parcelada inteira |
+| `GET` | `/relatorios/categorias?inicio=&fim=` | 🔒 | totais por categoria com comparação ao período anterior |
+| `GET` | `/relatorios/fontes-destinos?inicio=&fim=` | 🔒 | entradas por fonte, saídas por destino e saldo por conta |
+| `GET` | `/relatorios/faturas?meses=3` | 🔒 | faturas de cada cartão e limite utilizado (ver "Faturas de cartão") |
+| `GET` | `/saude-financeira` | 🔒 | indicadores, projeção de saldo e dicas do mês corrente |
 
 ### Lançamentos e parcelamento
 - Corpo: `{ tipo, valor, descricao, data (AAAA-MM-DD), categoriaId, fonteDestinoId, parcelas? }`. A categoria e a fonte/destino precisam ser do usuário e a categoria precisa ter o mesmo tipo do lançamento. Erros vêm por campo em `{ erro, campos }` (ex.: `campos.valor`, `campos.categoriaId`), todos de uma vez.
@@ -201,7 +264,11 @@ Limitações conhecidas: o limite de tentativas é por IP (não por conta) e fic
 
 ## Design system (front-end)
 - Tokens do Figma em `frontend/src/index.css`, com modo claro e escuro (`[data-theme="dark"]`). Use as classes do Tailwind (`bg-surface`, `text-text-muted`, `border-border-strong`...), sem cores soltas.
-- Componentes base em `frontend/src/components/ui`: `Button`, `Badge`, `Input`, `Select`, `Segmentado` e `MoneyText`.
+- Componentes base em `frontend/src/components/ui`:
+  - formulário: `Button`, `Input`, `InputSenha`, `Select`, `Campo`, `Segmentado`, `Chave`, `FiltroSelect`, `SeletorPeriodo` e `SeletorIntervalo`;
+  - exibição: `Badge`, `MoneyText`, `BarraLimite`, `Abas` (com `PainelAba`), `Paginacao` e `MenuAcoes`;
+  - camadas: `Gaveta`, `Dialogo`, `DialogoConfirmarExclusao` e `DialogoExclusaoBloqueada`;
+  - estados: `Carregando`, `ListaVazia`, `Aviso`, `BannerErro`, `MensagemErro` e `EstadoPagina`.
 - Ícones: Material Icons (Outlined) com `<Icone nome="add" />`, usando o nome do ícone do Figma.
 - Estados globais (`EstadoPagina`): no carregamento inicial de uma página, chame `mostrarErro(erro)` de `useOutletContext()` no `catch`. Falha de rede (requisição enviada sem resposta) mostra "sem conexão", 5xx mostra "erro do servidor" e 404 mostra "não encontrado" (inclusive item de outra conta), no lugar da página e sem a topbar; a função devolve `false` para os demais erros (outros status, requisição cancelada ou erro de código), que seguem na própria página. Erros de formulário e de exclusão não passam por ela. A tela some a cada navegação (inclusive voltar/avançar do navegador), em "Tentar de novo" e, no caso de sem conexão, quando a internet volta. "Tentar de novo" monta a página do zero: o período se mantém, mas filtros e paginação de Lançamentos voltam ao padrão. Rota desconhecida mostra o "não encontrado" dentro do shell. 401 de sessão expirada limpa a sessão e leva ao login com o banner.
 - Foco inicial em `Gaveta` e `Dialogo`: marque o campo com `data-autofocus` (não `autoFocus`). O `autoFocus` do React roda antes de o `<dialog>` abrir e o foco acaba no botão "Fechar".
