@@ -87,8 +87,9 @@ Regras de fontes e destinos: o nome é único por usuário **e tipo** (uma conta
 ### Relatório por fonte/destino
 - `GET /api/relatorios/fontes-destinos?inicio=AAAA-MM-DD&fim=AAAA-MM-DD`. Sem `inicio`/`fim` vale o mês corrente; período inválido devolve `400` com `campos`.
 - Resposta: `{ periodo, entradas: { total, fontes }, saidas: { total, destinos }, contas, saldoContas }`.
-- `fontes` e `destinos` trazem `{ id, nome, tipo, total }` em ordem decrescente de total, só com quem teve movimento no período.
-- `contas` lista todas as fontes/destinos do tipo conta, em ordem alfabética, com `{ id, nome, reserva, entradas, saidas, saldo }`, em que `saldo` = entradas − saídas da conta no período (contas sem movimento aparecem zeradas). `saldoContas` é a soma desses saldos. A mesma rota alimenta o "Saldo por conta" do Resumo e da lista de Fontes e destinos.
+- `fontes` e `destinos` trazem `{ id, nome, tipo, total }` em ordem decrescente de total, só com quem teve movimento no período. A separação é pelo **tipo do lançamento**, não pelo tipo da fonte/destino: uma entrada lançada num cartão (estorno) aparece em `fontes` com `tipo: "cartao_credito"`, e uma saída lançada numa renda aparece em `destinos` com `tipo: "renda"`. O relatório não filtra esses casos; o `tipo` vai na resposta para o front decidir como exibir.
+- `contas` lista todas as fontes/destinos do tipo conta, em ordem alfabética, com `{ id, nome, reserva, entradas, saidas, saldo }`. `saldoContas` é a soma desses saldos. A mesma rota alimenta o "Saldo por conta" do Resumo e da lista de Fontes e destinos.
+- **`saldo` é o movimento da conta no período**: entradas − saídas lançadas *naquela conta* entre `inicio` e `fim` (contas sem movimento aparecem zeradas). Não é saldo acumulado e não inclui o que foi lançado em fontes do tipo renda, porque o modelo não liga uma renda a uma conta. Por isso `saldoContas` só coincide com o saldo do mês (`totais.saldo` de `/lancamentos`) quando todas as entradas e saídas do período foram lançadas em contas. Ex.: salário de 6.800 na renda "Salário", e 550 de entrada e 1.750 de saída na Conta corrente → Conta corrente com `saldo` −1.200, enquanto o saldo do mês é positivo.
 - As somas e o saldo são calculados no banco com `SUM`, numa única consulta filtrada pelo usuário.
 
 ## Design system (front-end)

@@ -224,11 +224,6 @@ describe('relatórios (integração com Postgres)', { skip: pular }, () => {
     await u.lancar(lazer, 'saida', 72, '2026-11-10', visa);
     await u.lancar(lazer, 'saida', 33.34, '2026-11-15', visa);
 
-    await u.lancar(moradia, 'saida', 999, '2026-10-31');
-    await u.lancar(remuneracao, 'entrada', 999, '2026-12-01', poupanca);
-    const outro = await novoUsuario();
-    await outro.lancar(await outro.categoria('Moradia', 'saida', 1), 'saida', 999, '2026-11-10');
-
     const res = await consultar(u, '?inicio=2026-11-01&fim=2026-11-30', 'fontes-destinos');
 
     assert.equal(res.status, 200);
@@ -255,6 +250,69 @@ describe('relatórios (integração com Postgres)', { skip: pular }, () => {
       ],
       saldoContas: -1200,
     });
+  });
+
+  test('fontes-destinos: inclui lançamentos em inicio e fim, ignora o dia antes e o dia depois', async () => {
+    const u = await novoUsuario();
+    const moradia = await u.categoria('Moradia', 'saida', 1);
+    const salario = await u.categoria('Salário', 'entrada', 3);
+    await u.lancar(salario, 'entrada', 1000, '2026-11-01');
+    await u.lancar(moradia, 'saida', 300, '2026-11-30');
+    await u.lancar(salario, 'entrada', 999, '2026-10-31');
+    await u.lancar(moradia, 'saida', 999, '2026-12-01');
+
+    const { corpo } = await consultar(u, '?inicio=2026-11-01&fim=2026-11-30', 'fontes-destinos');
+
+    assert.equal(corpo.entradas.total, 1000);
+    assert.equal(corpo.saidas.total, 300);
+    assert.deepEqual(corpo.contas, [
+      { id: u.conta, nome: 'Conta corrente', reserva: false, entradas: 1000, saidas: 300, saldo: 700 },
+    ]);
+    assert.equal(corpo.saldoContas, 700);
+  });
+
+  test('fontes-destinos: não mistura dados de outro usuário', async () => {
+    const u = await novoUsuario();
+    const moradia = await u.categoria('Moradia', 'saida', 1);
+    await u.lancar(moradia, 'saida', 100, '2026-11-10');
+
+    const outro = await novoUsuario();
+    const renda = await outro.fonte('Salário', 'renda');
+    const cartao = await outro.fonte('Nubank', 'cartao_credito');
+    const salarioOutro = await outro.categoria('Salário', 'entrada', 3);
+    const lazerOutro = await outro.categoria('Lazer', 'saida', 4);
+    await outro.lancar(salarioOutro, 'entrada', 5000, '2026-11-05', renda);
+    await outro.lancar(lazerOutro, 'saida', 700, '2026-11-08', cartao);
+    await outro.lancar(lazerOutro, 'saida', 400, '2026-11-09');
+    // Lançamento de outro usuário apontando para a conta de `u`: não pode entrar no saldo dela.
+    await outro.lancar(salarioOutro, 'entrada', 900, '2026-11-12', u.conta);
+
+    const { corpo } = await consultar(u, '?inicio=2026-11-01&fim=2026-11-30', 'fontes-destinos');
+
+    assert.deepEqual(corpo.entradas, { total: 0, fontes: [] });
+    assert.deepEqual(corpo.saidas, {
+      total: 100,
+      destinos: [{ id: u.conta, nome: 'Conta corrente', tipo: 'conta', total: 100 }],
+    });
+    assert.deepEqual(corpo.contas, [
+      { id: u.conta, nome: 'Conta corrente', reserva: false, entradas: 0, saidas: 100, saldo: -100 },
+    ]);
+    assert.equal(corpo.saldoContas, -100);
+  });
+
+  test('fontes-destinos: separa pelo tipo do lançamento, não pelo tipo da fonte/destino', async () => {
+    const u = await novoUsuario();
+    const salario = await u.fonte('Salário', 'renda');
+    const visa = await u.fonte('Visa crédito', 'cartao_credito');
+    const remuneracao = await u.categoria('Salário', 'entrada', 3);
+    const outros = await u.categoria('Outros', 'saida', 8);
+    await u.lancar(remuneracao, 'entrada', 80, '2026-11-15', visa);
+    await u.lancar(outros, 'saida', 20, '2026-11-16', salario);
+
+    const { corpo } = await consultar(u, '?inicio=2026-11-01&fim=2026-11-30', 'fontes-destinos');
+
+    assert.deepEqual(corpo.entradas.fontes, [{ id: visa, nome: 'Visa crédito', tipo: 'cartao_credito', total: 80 }]);
+    assert.deepEqual(corpo.saidas.destinos, [{ id: salario, nome: 'Salário', tipo: 'renda', total: 20 }]);
   });
 
   test('fontes-destinos: sem lançamentos lista as contas zeradas', async () => {
