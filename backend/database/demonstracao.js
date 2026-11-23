@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { categoriasPadrao } from '../src/models/padroes.js';
 import { dividirEmParcelas, somarMeses } from '../src/models/parcelamento.js';
+import { hojeIso } from '../src/utils/periodo.js';
 
 export const SENHA_DEMONSTRACAO = 'senha1234';
+export const MES_DO_DESIGN = '2026-11';
 
 const entrada = (data, descricao, valor, categoria, fonte) => ({ tipo: 'entrada', data, descricao, valor, categoria, fonte });
 const saida = (data, descricao, valor, categoria, fonte) => ({ tipo: 'saida', data, descricao, valor, categoria, fonte });
@@ -91,11 +93,27 @@ const bruno = {
 
 export const USUARIOS_DEMONSTRACAO = [ana, bruno];
 
-async function inserirUsuario(client, usuario, senhaHash) {
+export function mesesDesdeODesign(hoje) {
+  const [ano, mes] = hoje.split('-').map(Number);
+  const [anoDesign, mesDesign] = MES_DO_DESIGN.split('-').map(Number);
+  return (ano - anoDesign) * 12 + (mes - mesDesign);
+}
+
+async function salvarUsuario(client, usuario, senhaHash) {
   const { rows: [{ id }] } = await client.query(
-    'INSERT INTO usuarios (nome, email, cpf, senha_hash) VALUES ($1, $2, $3, $4) RETURNING id',
+    `INSERT INTO usuarios (nome, email, cpf, senha_hash) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (email) DO UPDATE SET nome = EXCLUDED.nome, cpf = EXCLUDED.cpf, senha_hash = EXCLUDED.senha_hash
+     RETURNING id`,
     [usuario.nome, usuario.email, usuario.cpf, senhaHash],
   );
+  await client.query('DELETE FROM lancamentos WHERE usuario_id = $1', [id]);
+  await client.query('DELETE FROM fontes_destinos WHERE usuario_id = $1', [id]);
+  await client.query('DELETE FROM categorias WHERE usuario_id = $1', [id]);
+  return id;
+}
+
+async function popularUsuario(client, usuario, senhaHash, deslocamento) {
+  const id = await salvarUsuario(client, usuario, senhaHash);
 
   const categorias = new Map();
   for (const c of [...categoriasPadrao, ...usuario.categoriasExtras]) {
@@ -120,8 +138,8 @@ async function inserirUsuario(client, usuario, senhaHash) {
     `INSERT INTO lancamentos (usuario_id, tipo, descricao, valor, data, categoria_id, fonte_destino_id,
                               parcela_atual, total_parcelas, grupo_parcelamento)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [id, l.tipo, l.descricao, l.valor, l.data, categorias.get(`${l.tipo}:${l.categoria}`), fontes.get(l.fonte),
-      parcela.atual, parcela.total, parcela.grupo],
+    [id, l.tipo, l.descricao, l.valor, somarMeses(l.data, deslocamento),
+      categorias.get(`${l.tipo}:${l.categoria}`), fontes.get(l.fonte), parcela.atual, parcela.total, parcela.grupo],
   );
 
   for (const l of usuario.lancamentos) await inserirLancamento(l);
@@ -138,15 +156,11 @@ async function inserirUsuario(client, usuario, senhaHash) {
   return id;
 }
 
-export async function popularDemonstracao(client, senhaHash) {
-  await client.query(
-    'DELETE FROM usuarios WHERE email = ANY($1) OR cpf = ANY($2)',
-    [USUARIOS_DEMONSTRACAO.map((u) => u.email), USUARIOS_DEMONSTRACAO.map((u) => u.cpf)],
-  );
-
+export async function popularDemonstracao(client, senhaHash, hoje = hojeIso()) {
+  const deslocamento = mesesDesdeODesign(hoje);
   const ids = {};
   for (const usuario of USUARIOS_DEMONSTRACAO) {
-    ids[usuario.email] = await inserirUsuario(client, usuario, senhaHash);
+    ids[usuario.email] = await popularUsuario(client, usuario, senhaHash, deslocamento);
   }
   return ids;
 }

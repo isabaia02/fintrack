@@ -16,8 +16,9 @@ describe('seed de demonstração (integração com Postgres)', { skip: pular }, 
   let buscarFaturas;
   let porCategoria;
   let ids;
+  let idsDaPrimeiraExecucao;
 
-  const popular = () => emTransacao((client) => demonstracao.popularDemonstracao(client, 'hash-de-teste'));
+  const popular = (hoje = HOJE) => emTransacao((client) => demonstracao.popularDemonstracao(client, 'hash-de-teste', hoje));
   const contar = async (sql, params) => (await pool.query(sql, params)).rows[0].total;
 
   before(async () => {
@@ -33,7 +34,7 @@ describe('seed de demonstração (integração com Postgres)', { skip: pular }, 
     await pool.query(
       `INSERT INTO usuarios (nome, email, cpf, senha_hash) VALUES ('Outra pessoa', 'outra@teste.com', '39053344705', 'x')`,
     );
-    await popular();
+    idsDaPrimeiraExecucao = await popular();
     ids = await popular();
   });
 
@@ -41,7 +42,8 @@ describe('seed de demonstração (integração com Postgres)', { skip: pular }, 
     await pool?.end();
   });
 
-  test('é idempotente e não mexe em outros usuários', async () => {
+  test('é idempotente, mantém os ids e não mexe em outros usuários', async () => {
+    assert.deepEqual(ids, idsDaPrimeiraExecucao);
     assert.equal(await contar('SELECT COUNT(*)::int AS total FROM usuarios'), 3);
     assert.equal(await contar(`SELECT COUNT(*)::int AS total FROM usuarios WHERE email = 'outra@teste.com'`), 1);
     assert.equal(
@@ -122,5 +124,29 @@ describe('seed de demonstração (integração com Postgres)', { skip: pular }, 
       await contar('SELECT COUNT(*)::int AS total FROM categorias WHERE usuario_id = $1 AND nome = $2', [id, demonstracao.CATEGORIA_NOME_LONGO]),
       1,
     );
+  });
+
+  test('recusa sem apagar nada quando outra conta usa o CPF da Ana', async () => {
+    await pool.query(`UPDATE usuarios SET email = 'ana.antiga@teste.com' WHERE id = $1`, [ids['ana@email.com']]);
+    await assert.rejects(popular(), { code: '23505' });
+    assert.equal(
+      await contar('SELECT COUNT(*)::int AS total FROM lancamentos WHERE usuario_id = $1', [ids['ana@email.com']]),
+      34,
+    );
+    await pool.query(`UPDATE usuarios SET email = 'ana@email.com' WHERE id = $1`, [ids['ana@email.com']]);
+  });
+
+  test('desloca as datas para o mês em que o seed roda, mantendo os valores do design', async () => {
+    await popular('2027-02-10');
+    const { totais } = await Lancamento.listar(ids['ana@email.com'], { inicio: '2027-02-01', fim: '2027-02-28', pagina: 1 });
+    assert.deepEqual(totais, { entradas: 7350, saidas: 2666.64, saldo: 4683.36 });
+
+    const visa = (await buscarFaturas(ids['ana@email.com'], { meses: 3, hoje: '2027-02-22' }))
+      .find((c) => c.nome === 'Visa crédito');
+    assert.deepEqual(
+      visa.faturas.map((f) => [f.referencia, f.total]),
+      [['03/2027', 555.34], ['04/2027', 483.33], ['05/2027', 483.33], ['06/2027', 450]],
+    );
+    assert.equal(visa.limite_utilizado, 3772);
   });
 });
