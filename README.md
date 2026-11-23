@@ -10,7 +10,7 @@ Projeto 2 de Desenvolvimento Web Full Stack: API REST (Node.js/Express + Postgre
 ## Estrutura
 ```
 backend/
-  database/    schema.sql, run-schema.js, seed.js
+  database/    schema.sql, run-schema.js, seed.js, demonstracao.js (dados do seed)
   src/
     server.js
     routes/        rotas + controladores
@@ -33,7 +33,7 @@ Utilitários puros (`cpfValido`, `calcularFatura`, `dividirEmParcelas`, `somarMe
    cp .env.example .env      # ajuste DATABASE_URL e JWT_SECRET
    npm install
    npm run db:schema         # cria as tabelas
-   npm run db:seed           # 2 usuários + lançamentos (senha: senha1234)
+   npm run db:seed           # usuários de demonstração (ver "Seed de demonstração")
    npm run dev               # http://localhost:3000
    ```
 3. Front-end:
@@ -45,6 +45,19 @@ Utilitários puros (`cpfValido`, `calcularFatura`, `dividirEmParcelas`, `somarMe
    ```
 
 Usuários do seed: `ana@email.com` e `bruno@email.com` (senha `senha1234`).
+
+### Seed de demonstração
+`npm run db:seed` grava os dados de exemplo do design (Figma) numa única transação. É idempotente: antes de inserir, apaga só os usuários de demonstração (pelo e-mail ou CPF), e o `ON DELETE CASCADE` leva junto as categorias, fontes e lançamentos deles. Rodar de novo recria tudo igual e não mexe em outras contas. Os dados ficam em `backend/database/demonstracao.js`.
+
+- **Ana Souza** (`ana@email.com`): categorias padrão; fontes Salário (renda), Conta corrente, Poupança (reserva), Nubank (fecha dia 3, vence dia 10, limite R$ 8.000,00) e Visa crédito (fecha dia 25, vence dia 5, limite R$ 5.000,00).
+  - **Novembro de 2026**: os 8 lançamentos da lista do design (entradas R$ 7.350,00 e saídas R$ 2.216,64) mais a parcela 3/10 do Notebook.
+  - **Compras parceladas no Visa**: Cabo e carregador (R$ 100,00 em 3×, a partir de 15/11/2026) e Notebook (R$ 4.500,00 em 10×, a partir de 20/09/2026).
+  - **Setembro e outubro**: aluguel, alimentação e mobilidade com os valores do relatório por categoria do design (outubro R$ 1.500,00 / R$ 980,50 / R$ 769,50; setembro R$ 1.500,00 / R$ 870,00 / R$ 812,30), salário e dois freelas de R$ 1.000,00 depositados na Poupança, que formam a reserva de emergência.
+- **Bruno Lima** (`bruno@email.com`): caso de estresse, sem cartões. Tem 64 lançamentos em novembro de 2026 (4 páginas), uma descrição de 120 caracteres, um lançamento de R$ 1.234.567,89 e a categoria "Manutenção da casa, reformas, consertos e imprevistos do mês" (60 caracteres, o máximo).
+
+**O que bate com o design.** Faturas do Visa: 12/2026 R$ 555,34 (Cinema, Cabo 1/3 e Notebook 3/10), 01/2027 e 02/2027 R$ 483,33 e 03/2027 R$ 450,00, com R$ 3.772,00 de limite utilizado e R$ 1.228,00 disponível. Nubank: fatura 12/2026 de R$ 361,30. Esses valores aparecem iguais em Faturas, nas "Próximas faturas" do Resumo e em Fontes e destinos. Os testes em `backend/test/seed.test.js` conferem esses números com "hoje" fixo em 22/11/2026. Na tela, eles batem entre 06/11 e 24/11/2026. Em outras datas, as faturas avançam normalmente pela regra de fechamento.
+
+**Divergências conhecidas.** No documento de design, o Notebook 3/10 está na fatura do Visa, mas não na lista nem nos totais de novembro. Decidimos manter o Notebook, porque sem ele nenhuma tela de cartão bateria. Com isso, novembro fica com saídas de R$ 2.666,64 e saldo de R$ 4.683,36 (no design: R$ 2.216,64 e R$ 5.133,36), e o Visa aparece com R$ 555,34 no relatório por fonte/destino (no design: R$ 105,34). Pelo mesmo motivo, as parcelas 1/10 e 2/10 entram em setembro e outubro como Educação. Os saldos das contas no design (Conta corrente R$ 3.133,36 e Poupança R$ 2.000,00) não podem ser reproduzidos, porque o `saldo` da API é o movimento do mês na conta (ver "Relatório por fonte/destino"). No seed, a Conta corrente fica com −R$ 1.200,00 em novembro. A Poupança fica com R$ 0,00 no mês e R$ 2.000,00 acumulados, que é o que a reserva de emergência da Saúde financeira usa.
 
 ### Testes do back-end
 ```bash
