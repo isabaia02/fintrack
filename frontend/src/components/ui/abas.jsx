@@ -5,9 +5,12 @@ export function Abas({ abas, ativa, onChange, rotulo, idBase }) {
   const base = idBase ?? gerado;
 
   function aoTeclar(e, indice) {
-    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const passo = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+    if (passo === undefined && e.key !== 'Home' && e.key !== 'End') return;
     e.preventDefault();
-    const proximo = (indice + (e.key === 'ArrowRight' ? 1 : -1) + abas.length) % abas.length;
+    let proximo = (indice + passo + abas.length) % abas.length;
+    if (e.key === 'Home') proximo = 0;
+    if (e.key === 'End') proximo = abas.length - 1;
     onChange(abas[proximo].valor);
     document.getElementById(`${base}-aba-${abas[proximo].valor}`)?.focus();
   }
@@ -23,7 +26,7 @@ export function Abas({ abas, ativa, onChange, rotulo, idBase }) {
             type="button"
             role="tab"
             aria-selected={selecionada}
-            aria-controls={`${base}-painel-${aba.valor}`}
+            aria-controls={selecionada ? `${base}-painel-${aba.valor}` : undefined}
             tabIndex={selecionada ? 0 : -1}
             onClick={() => onChange(aba.valor)}
             onKeyDown={(e) => aoTeclar(e, i)}

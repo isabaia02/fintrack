@@ -24,48 +24,49 @@ function ItemFatura({ item }) {
   );
 }
 
-export function FaturaBloco({ fatura, inicialmenteAberta }) {
+export function FaturaBloco({ fatura, fechada = false, inicialmenteAberta }) {
   const [aberta, setAberta] = useState(inicialmenteAberta);
   const idPainel = useId();
 
   return (
     <article className="overflow-hidden rounded-md border border-border bg-surface">
-      <button
-        type="button"
-        aria-expanded={aberta}
-        aria-controls={idPainel}
-        onClick={() => setAberta((v) => !v)}
-        className="flex h-[72px] w-full items-center justify-between gap-4 px-5 text-left hover:bg-surface-sunken"
-      >
-        <span className="flex flex-col gap-0.5">
-          <span className="flex items-center gap-2">
-            <h3>Fatura {fatura.referencia}</h3>
-            {fatura.aberta && <Badge tom="info">Aberta</Badge>}
+      <h3>
+        <button
+          type="button"
+          aria-expanded={aberta}
+          aria-controls={idPainel}
+          onClick={() => setAberta((v) => !v)}
+          className="flex h-[72px] w-full items-center justify-between gap-4 px-5 text-left hover:bg-surface-sunken"
+        >
+          <span className="flex flex-col gap-0.5">
+            <span className="flex items-center gap-2">
+              <span className="text-base font-semibold">Fatura {fatura.referencia}</span>
+              {fatura.aberta && <Badge tom="info">Aberta</Badge>}
+              {fechada && <Badge>Fechada</Badge>}
+            </span>
+            <span className="text-xs font-normal text-text-muted">
+              Fecha {diaMes(fatura.fechamento)} · vence {diaMes(fatura.vencimento)}
+            </span>
           </span>
-          <span className="text-xs font-normal text-text-muted">
-            Fecha {diaMes(fatura.fechamento)} · vence {diaMes(fatura.vencimento)}
+          <span className="flex items-center gap-3">
+            <span className="font-mono text-2xl leading-8 font-medium tracking-[-0.01em]">{formatarMoeda(fatura.total)}</span>
+            <Icone nome={aberta ? 'expand_less' : 'expand_more'} />
           </span>
-        </span>
-        <span className="flex items-center gap-3">
-          <span className="font-mono text-2xl leading-8 font-medium tracking-[-0.01em]">{formatarMoeda(fatura.total)}</span>
-          <Icone nome={aberta ? 'expand_less' : 'expand_more'} />
-        </span>
-      </button>
+        </button>
+      </h3>
 
-      {aberta && (
-        <div id={idPainel} className="border-t border-border">
-          {fatura.itens.length === 0 ? (
-            <p className="flex h-[72px] items-center justify-center gap-2 text-sm text-text-muted">
-              <Icone nome="check_circle" />
-              Nenhuma parcela prevista.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {fatura.itens.map((item) => <ItemFatura key={item.id} item={item} />)}
-            </ul>
-          )}
-        </div>
-      )}
+      <div id={idPainel} hidden={!aberta} className="border-t border-border">
+        {fatura.itens.length === 0 ? (
+          <p className="flex h-[72px] items-center justify-center gap-2 text-sm text-text-muted">
+            <Icone nome="check_circle" />
+            Nenhuma parcela prevista.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {fatura.itens.map((item) => <ItemFatura key={item.id} item={item} />)}
+          </ul>
+        )}
+      </div>
     </article>
   );
 }

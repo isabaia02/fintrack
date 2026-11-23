@@ -45,3 +45,40 @@ export async function porCategoria(usuarioId, periodo) {
     entradas: resumir(rows.filter((c) => c.tipo === 'entrada')),
   };
 }
+
+const porTotal = (a, b) => b.total - a.total;
+
+function totaisPor(linhas, campo) {
+  return linhas
+    .filter((linha) => linha[campo] > 0)
+    .map((linha) => ({ id: linha.id, nome: linha.nome, tipo: linha.tipo, total: linha[campo] }))
+    .sort(porTotal);
+}
+
+export async function porFonteDestino(usuarioId, periodo) {
+  const { rows } = await pool.query(
+    `SELECT f.id, f.nome, f.tipo, f.reserva,
+            COALESCE(SUM(l.valor) FILTER (WHERE l.tipo = 'entrada'), 0)::float8 AS entradas,
+            COALESCE(SUM(l.valor) FILTER (WHERE l.tipo = 'saida'), 0)::float8 AS saidas,
+            COALESCE(SUM(CASE WHEN l.tipo = 'entrada' THEN l.valor ELSE -l.valor END), 0)::float8 AS saldo
+     FROM fontes_destinos f
+     LEFT JOIN lancamentos l
+       ON l.fonte_destino_id = f.id AND l.usuario_id = f.usuario_id AND l.data BETWEEN $2 AND $3
+     WHERE f.usuario_id = $1
+     GROUP BY f.id
+     ORDER BY LOWER(f.nome)`,
+    [usuarioId, periodo.inicio, periodo.fim],
+  );
+
+  const fontes = totaisPor(rows, 'entradas');
+  const destinos = totaisPor(rows, 'saidas');
+  const contas = rows.filter((linha) => linha.tipo === 'conta').map(({ tipo, ...conta }) => conta);
+
+  return {
+    periodo,
+    entradas: { total: somar(fontes, 'total'), fontes },
+    saidas: { total: somar(destinos, 'total'), destinos },
+    contas,
+    saldoContas: somar(contas, 'saldo'),
+  };
+}

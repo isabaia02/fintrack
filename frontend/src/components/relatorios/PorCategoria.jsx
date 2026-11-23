@@ -9,7 +9,7 @@ import { Variacao } from './Variacao';
 
 const celula = 'font-mono text-sm';
 
-function Tabela({ saidas, comparar }) {
+function Tabela({ categorias, saidas, comparar }) {
   return (
     <div className="min-w-0 flex-1 overflow-x-auto rounded-md border border-border bg-surface">
       <table className="w-full min-w-[520px] border-collapse">
@@ -24,7 +24,7 @@ function Tabela({ saidas, comparar }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {saidas.categorias.map((c) => (
+          {categorias.map((c) => (
             <tr key={c.id} className="h-[52px]">
               <th scope="row" className="px-5 text-left text-sm font-medium">
                 <span className="flex items-center gap-2.5">
@@ -60,7 +60,9 @@ export function PorCategoria({ periodo, comparar }) {
   if (erro) return <MensagemErro mensagem={erro} onTentarDeNovo={recarregar} />;
 
   const { saidas } = dados;
-  if (saidas.categorias.length === 0) {
+  const categorias = comparar ? saidas.categorias : saidas.categorias.filter((c) => c.total > 0);
+  const semDados = saidas.total === 0 && (!comparar || saidas.totalAnterior === 0);
+  if (semDados) {
     return <ListaVazia titulo="Nenhuma saída neste período" frase="Escolha outro período ou registre lançamentos de saída." />;
   }
 
@@ -80,8 +82,8 @@ export function PorCategoria({ periodo, comparar }) {
       </div>
 
       <div className="flex flex-col items-start gap-6 lg:flex-row">
-        <Tabela saidas={saidas} comparar={comparar} />
-        <BarrasComparativas categorias={saidas.categorias} comparar={comparar} />
+        <Tabela categorias={categorias} saidas={saidas} comparar={comparar} />
+        <BarrasComparativas categorias={categorias} comparar={comparar} />
       </div>
     </div>
   );

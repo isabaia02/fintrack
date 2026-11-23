@@ -11,12 +11,18 @@ export function SeletorIntervalo({ valor, onChange }) {
   const [fim, setFim] = useState(valor.fim);
   const [erro, setErro] = useState('');
   const raiz = useRef(null);
+  const gatilho = useRef(null);
+  const painel = useRef(null);
   const predefinidos = periodosPredefinidos();
 
   useEffect(() => {
     if (!aberto) return undefined;
     const fecharFora = (e) => { if (!raiz.current?.contains(e.target)) setAberto(false); };
-    const fecharEsc = (e) => { if (e.key === 'Escape') setAberto(false); };
+    const fecharEsc = (e) => {
+      if (e.key !== 'Escape') return;
+      setAberto(false);
+      gatilho.current?.focus();
+    };
     document.addEventListener('mousedown', fecharFora);
     document.addEventListener('keydown', fecharEsc);
     return () => {
@@ -24,6 +30,17 @@ export function SeletorIntervalo({ valor, onChange }) {
       document.removeEventListener('keydown', fecharEsc);
     };
   }, [aberto]);
+
+  useEffect(() => {
+    if (!aberto) return;
+    const alvo = painel.current?.querySelector('[aria-current="true"]') ?? painel.current?.querySelector('button, input');
+    alvo?.focus();
+  }, [aberto]);
+
+  const fechar = () => {
+    setAberto(false);
+    gatilho.current?.focus();
+  };
 
   const alternar = () => {
     if (!aberto) {
@@ -36,7 +53,7 @@ export function SeletorIntervalo({ valor, onChange }) {
 
   const escolher = (periodo) => {
     onChange({ id: periodo.id, inicio: periodo.inicio, fim: periodo.fim });
-    setAberto(false);
+    fechar();
   };
 
   function aplicarPersonalizado(e) {
@@ -44,7 +61,7 @@ export function SeletorIntervalo({ valor, onChange }) {
     if (!inicio || !fim) return setErro('Informe as duas datas.');
     if (inicio > fim) return setErro('A data final deve ser igual ou posterior à inicial.');
     onChange({ id: 'personalizado', inicio, fim });
-    return setAberto(false);
+    return fechar();
   }
 
   const item = (ativo) => `flex h-9 w-full items-center rounded-sm px-3 text-left text-sm hover:bg-surface-sunken ${ativo ? 'bg-accent-soft font-medium text-primary' : 'text-text'}`;
@@ -52,6 +69,7 @@ export function SeletorIntervalo({ valor, onChange }) {
   return (
     <div ref={raiz} className="relative">
       <button
+        ref={gatilho}
         type="button"
         aria-haspopup="dialog"
         aria-expanded={aberto}
@@ -64,9 +82,9 @@ export function SeletorIntervalo({ valor, onChange }) {
       </button>
 
       {aberto && (
-        <div role="dialog" aria-label="Escolher período" className="absolute top-full left-0 z-10 mt-1 w-72 rounded-md border border-border bg-surface p-1 shadow-popover">
+        <div ref={painel} role="dialog" aria-label="Escolher período" className="absolute top-full left-0 z-10 mt-1 w-72 rounded-md border border-border bg-surface p-1 shadow-popover">
           {predefinidos.map((p) => (
-            <button key={p.id} type="button" className={item(valor.id === p.id)} onClick={() => escolher(p)}>
+            <button key={p.id} type="button" aria-current={valor.id === p.id ? 'true' : undefined} className={item(valor.id === p.id)} onClick={() => escolher(p)}>
               {p.rotulo}
             </button>
           ))}
