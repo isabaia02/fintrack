@@ -1,3 +1,5 @@
+import { limparTexto } from '../utils/texto.js';
+
 export const TIPOS_FONTE_DESTINO = ['renda', 'conta', 'cartao_credito'];
 
 const LIMITE_MAXIMO = 9_999_999_999.99; 
@@ -10,7 +12,7 @@ function limiteValido(v) {
 
 export function validarFonteDestino(req, res, next) {
   const corpo = req.body ?? {};
-  const nome = typeof corpo.nome === 'string' ? corpo.nome.trim() : '';
+  const nome = limparTexto(corpo.nome);
   const { tipo } = corpo;
   const campos = {};
 

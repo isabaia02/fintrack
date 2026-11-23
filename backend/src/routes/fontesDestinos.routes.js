@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { autenticar } from '../middlewares/autenticar.js';
 import { validarFonteDestino, validarTipoFiltro } from '../middlewares/validarFonteDestino.js';
 import * as FonteDestino from '../models/fonteDestino.js';
+import { exigirIdValido } from '../middlewares/validarId.js';
 import { idValido } from '../utils/id.js';
 
 const router = Router();
@@ -38,7 +39,7 @@ router.post('/', validarFonteDestino, async (req, res, next) => {
   }
 });
 
-router.put('/:id', validarFonteDestino, async (req, res, next) => {
+router.put('/:id', exigirIdValido(NAO_ENCONTRADO), validarFonteDestino, async (req, res, next) => {
   const id = idValido(req.params.id);
   if (!id) return res.status(404).json(NAO_ENCONTRADO);
   try {

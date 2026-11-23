@@ -6,6 +6,7 @@ import {
   validarTipoFiltro,
 } from '../middlewares/validarCategoria.js';
 import * as Categoria from '../models/categoria.js';
+import { exigirIdValido } from '../middlewares/validarId.js';
 import { idValido } from '../utils/id.js';
 
 const router = Router();
@@ -38,7 +39,7 @@ router.post('/', validarCriacaoCategoria, async (req, res, next) => {
   }
 });
 
-router.put('/:id', validarEdicaoCategoria, async (req, res, next) => {
+router.put('/:id', exigirIdValido(NAO_ENCONTRADA), validarEdicaoCategoria, async (req, res, next) => {
   const id = idValido(req.params.id);
   if (!id) return res.status(404).json(NAO_ENCONTRADA);
   try {

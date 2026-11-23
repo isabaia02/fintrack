@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { ALGORITMO_JWT, jwtConfig } from '../config/jwt.js';
 import { CUSTO_BCRYPT } from '../config/senha.js';
 import { autenticar } from '../middlewares/autenticar.js';
-import { limitarLogin } from '../middlewares/limitarLogin.js';
+import { limitarCadastro, limitarLogin } from '../middlewares/limitarLogin.js';
 import { validarCadastro } from '../middlewares/validarCadastro.js';
 import { validarLogin } from '../middlewares/validarLogin.js';
 import { criarComPadroes, campoDuplicado, buscarPorEmail, buscarPorId } from '../models/usuario.js';
@@ -18,7 +18,7 @@ const MENSAGENS_DUPLICADO = {
   cpf: 'Já existe um usuário com este CPF.',
 };
 
-router.post('/cadastro', validarCadastro, async (req, res, next) => {
+router.post('/cadastro', limitarCadastro, validarCadastro, async (req, res, next) => {
   const { nome, email, cpf, senha } = req.dadosCadastro;
   try {
     const senhaHash = await bcrypt.hash(senha, CUSTO_BCRYPT);
