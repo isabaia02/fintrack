@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { PeriodoProvider } from '../../contexts/PeriodoContext';
 import { tipoDaFalha } from '../../services/api';
@@ -7,19 +7,22 @@ import { paginaDaRota } from './navegacao';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 
-const enderecoAtual = () => window.location.pathname + window.location.search;
-
 export default function ShellAutenticado() {
-  const { pathname, search } = useLocation();
+  const { pathname, key } = useLocation();
   const navigate = useNavigate();
   const [acaoBloqueada, setAcaoBloqueada] = useState(false);
   const [falha, setFalha] = useState(null);
+  const navegacaoAtual = useRef(key);
+
+  useEffect(() => {
+    navegacaoAtual.current = key;
+  }, [key]);
 
   const contexto = useMemo(() => ({
     bloquearAcao: setAcaoBloqueada,
     mostrarErro: (erro) => {
       const tipo = tipoDaFalha(erro);
-      if (tipo) setFalha({ tipo, endereco: enderecoAtual() });
+      if (tipo) setFalha({ tipo, navegacao: navegacaoAtual.current });
       return Boolean(tipo);
     },
   }), []);
@@ -30,12 +33,7 @@ export default function ShellAutenticado() {
     return () => window.removeEventListener('online', aoReconectar);
   }, []);
 
-  const falhaAtual = falha?.endereco === pathname + search ? falha : null;
-
-  const voltarAoResumo = () => {
-    setFalha(null);
-    navigate('/');
-  };
+  const falhaAtual = falha?.navegacao === key ? falha : null;
 
   return (
     <PeriodoProvider>
@@ -47,7 +45,7 @@ export default function ShellAutenticado() {
               <EstadoPagina
                 tipo={falhaAtual.tipo}
                 onTentarDeNovo={() => setFalha(null)}
-                onVoltarAoResumo={voltarAoResumo}
+                onVoltarAoResumo={() => navigate('/')}
               />
             ) : (
               <>

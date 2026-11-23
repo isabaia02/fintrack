@@ -14,7 +14,6 @@ let aoNaoAutorizado = () => {};
 export const definirAoNaoAutorizado = (fn) => { aoNaoAutorizado = fn; };
 
 export function tipoDaFalha(erro) {
-  if (axios.isCancel(erro)) return null;
   if (!erro.response) return 'sem-conexao';
   const { status } = erro.response;
   if (status === 404) return 'nao-encontrado';
