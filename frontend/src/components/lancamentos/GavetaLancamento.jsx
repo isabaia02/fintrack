@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../../services/api';
-import { mascararValor, valorDaMascara } from '../../utils/formatadores';
+import { dataDeHoje, mascararValor, valorDaMascara } from '../../utils/formatadores';
 import { MAX_PARCELAS, calcularFatura, resumirParcelas } from '../../utils/parcelamento';
 import { GRUPOS } from '../fontes-destinos/rotulos';
 import { Button } from '../ui/button';
@@ -21,14 +21,9 @@ const NOME_TIPO = { entrada: 'entrada', saida: 'saída' };
 const DIGITOS_VALOR = 12;
 const OPCOES_PARCELAS = Array.from({ length: MAX_PARCELAS }, (_, i) => i + 1);
 
-function hoje() {
-  const d = new Date();
-  return [d.getFullYear(), d.getMonth() + 1, d.getDate()].map((n) => String(n).padStart(2, '0')).join('-');
-}
-
 function valoresIniciais(item) {
   if (!item) {
-    return { tipo: 'saida', valor: '', descricao: '', data: hoje(), categoriaId: '', fonteDestinoId: '', parcelas: 1 };
+    return { tipo: 'saida', valor: '', descricao: '', data: dataDeHoje(), categoriaId: '', fonteDestinoId: '', parcelas: 1 };
   }
   return {
     tipo: item.tipo,
