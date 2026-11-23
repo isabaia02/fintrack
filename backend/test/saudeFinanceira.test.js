@@ -5,6 +5,7 @@ import { projetarSaldo } from '../src/models/projecaoSaldo.js';
 import { gerarDicasPorRegras } from '../src/models/dicas.js';
 import { montarSaudeFinanceira } from '../src/models/saudeFinanceira.js';
 import { dicasDaIaOuVazio, gerarDicasIa, lerDicas, resumirParaIa } from '../src/services/iaDicas.js';
+import { montarFaturas } from '../src/models/faturasCartao.js';
 import { formatarMoeda } from '../src/utils/formato.js';
 
 const HOJE = '2026-11-20';
@@ -87,6 +88,17 @@ describe('comprometimento com cartões', () => {
     assert.equal(por.comprometimento_cartoes.valor, 62);
     assert.equal(por.comprometimento_cartoes.status, 'atencao');
     assert.match(por.comprometimento_cartoes.mensagem, /comprometem 62% da sua renda/);
+  });
+
+  test('entre o fechamento e o vencimento, a fatura fechada a pagar entra entre as 3 primeiras', () => {
+    // Visa fecha dia 25 e vence dia 5: em 26/11 a fatura de 12/2026 já fechou, mas vence só em 05/12.
+    const visa = { id: 1, nome: 'Visa crédito', dia_fechamento: 25, dia_vencimento: 5, limite: 5000 };
+    const lancamentosDoCartao = [{ id: 1, fonte_destino_id: 1, descricao: 'Notebook', data: '2026-11-20', valor: 450, parcela_atual: 1, total_parcelas: 1 }];
+    const [cartaoReal] = montarFaturas({ cartoes: [visa], lancamentos: lancamentosDoCartao, hoje: '2026-11-26', meses: 2 });
+    assert.deepEqual(cartaoReal.faturas.map((f) => f.referencia), ['12/2026', '01/2027', '02/2027', '03/2027']);
+
+    const { por } = indicadores([entrada('2026-11-05', 1000)], { hoje: '2026-11-26', cartoes: [cartaoReal] });
+    assert.equal(por.comprometimento_cartoes.valor, 45); // os 450 da fatura fechada contam
   });
 
   test('soma vários cartões e classifica: até 30% bom, acima de 70% alerta', () => {
@@ -195,6 +207,14 @@ describe('categoria fora da curva', () => {
     assert.equal(c.valor, 12.7);
     assert.equal(c.status, 'atencao');
     assert.equal(c.mensagem, 'Gastos com alimentação subiram 12,7% em relação ao mês anterior.');
+    assert.equal(c.titulo, 'Alimentação fora da curva');
+  });
+
+  test('o título leva a categoria só quando há alta relevante; senão fica o genérico', () => {
+    const { por } = indicadores([...base, saida('2026-11-10', 1050, 'Alimentação')]);
+    assert.equal(por.categoria_fora_da_curva.status, 'bom');
+    assert.equal(por.categoria_fora_da_curva.titulo, 'Categoria fora da curva');
+    assert.equal(indicadores([]).por.categoria_fora_da_curva.titulo, 'Categoria fora da curva');
   });
 
   test('30% ou mais é alerta; menos de 10% é bom', () => {
@@ -311,6 +331,46 @@ describe('serviço de IA (opcional, com degradação silenciosa)', () => {
     assert.equal(lerDicas(JSON.stringify(['x'.repeat(500)]))[0].length, 200);
     assert.throws(() => lerDicas('{"a":1}'));
     assert.throws(() => lerDicas('não é json'));
+  });
+
+  test('o pedido usa esforço baixo e saída estruturada, e a instrução não pede array solto', async () => {
+    let corpoEnviado;
+    await gerarDicasIa(resumo, {
+      chave: 'k',
+      buscar: async (_url, { body }) => {
+        corpoEnviado = JSON.parse(body);
+        return { ok: true, status: 200, json: async () => textoIa('{"dicas":["Dica"]}') };
+      },
+    });
+    assert.equal(corpoEnviado.output_config.effort, 'low');
+    assert.equal(corpoEnviado.output_config.format.type, 'json_schema');
+    assert.deepEqual(corpoEnviado.output_config.format.schema.required, ['dicas']);
+  });
+
+  test('lê o bloco de texto por tipo, mesmo depois de blocos de thinking', async () => {
+    const comThinking = {
+      stop_reason: 'end_turn',
+      content: [
+        { type: 'thinking', thinking: '', signature: 'x' },
+        { type: 'thinking', thinking: '', signature: 'y' },
+        { type: 'text', text: '{"dicas":["Dica A","Dica B","Dica C"]}' },
+      ],
+    };
+    assert.deepEqual(await gerarDicasIa(resumo, { chave: 'k', buscar: resposta(comThinking) }), ['Dica A', 'Dica B']);
+  });
+
+  test('lerDicas aceita o objeto { dicas } e continua aceitando um array', () => {
+    assert.deepEqual(lerDicas('{"dicas":["a"]}'), ['a']);
+    assert.throws(() => lerDicas('{"dicas":"a"}'));
+  });
+
+  test('resposta cortada (max_tokens) ou recusada não vira dica', async () => {
+    for (const stop_reason of ['max_tokens', 'refusal']) {
+      const buscar = resposta({ stop_reason, content: [{ type: 'text', text: '{"dicas":["incompleta"]}' }] });
+      await assert.rejects(gerarDicasIa(resumo, { chave: 'k', buscar }), /interrompida/);
+    }
+    const semTexto = resposta({ stop_reason: 'end_turn', content: [{ type: 'thinking', thinking: '', signature: 'x' }] });
+    await assert.rejects(gerarDicasIa(resumo, { chave: 'k', buscar: semTexto }), /sem bloco de texto/);
   });
 
   test('resposta válida vira dicas com origem "ia"', async () => {

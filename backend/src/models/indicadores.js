@@ -155,12 +155,13 @@ function categoriaForaDaCurva(mes, atual, anterior) {
   }
   const valor = arredondar(pior.variacao);
   const nome = pior.categoria.toLowerCase();
+  const tituloDaCategoria = `${pior.categoria} fora da curva`;
   if (valor < LIMITES.foraDaCurvaAtencao) {
     return { item: indicador('categoria_fora_da_curva', titulo, valor, 'variacao', 'bom',
       `Nenhuma categoria subiu mais de ${LIMITES.foraDaCurvaAtencao}% em relação ao mês anterior. A maior variação foi em ${nome} (${valor > 0 ? '+' : ''}${formatarNumero(valor)}%).`), pior: null };
   }
   const status = valor >= LIMITES.foraDaCurvaAlerta ? 'alerta' : 'atencao';
-  return { item: indicador('categoria_fora_da_curva', titulo, valor, 'variacao', status,
+  return { item: indicador('categoria_fora_da_curva', tituloDaCategoria, valor, 'variacao', status,
     `Gastos com ${nome} subiram ${formatarNumero(valor)}% em relação ao mês anterior.`), pior };
 }
 

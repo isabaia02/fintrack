@@ -34,7 +34,7 @@ export async function carregarDados(usuarioId, hoje) {
       `SELECT COUNT(DISTINCT f.id)::int AS contas,
               COALESCE(SUM(CASE WHEN l.tipo = 'entrada' THEN l.valor ELSE -l.valor END), 0)::float8 AS saldo
        FROM fontes_destinos f
-       LEFT JOIN lancamentos l ON l.fonte_destino_id = f.id AND l.data <= $2
+       LEFT JOIN lancamentos l ON l.fonte_destino_id = f.id AND l.usuario_id = f.usuario_id AND l.data <= $2
        WHERE f.usuario_id = $1 AND f.reserva`,
       [usuarioId, hoje],
     ),

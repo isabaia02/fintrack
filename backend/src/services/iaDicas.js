@@ -5,9 +5,18 @@ export const MAX_DICAS_IA = 2;
 const MAX_TEXTO = 200;
 
 const INSTRUCAO = `Você escreve dicas curtas de educação financeira em português do Brasil.
-Receba indicadores de saúde financeira em JSON e responda SOMENTE com um array JSON de até ${MAX_DICAS_IA} strings,
+Receba indicadores de saúde financeira em JSON e responda com até ${MAX_DICAS_IA} dicas,
 cada uma com no máximo ${MAX_TEXTO} caracteres, em tom gentil, concreto e sem prometer resultados.
 Não recomende produtos, investimentos nem instituições.`;
+
+const SCHEMA_DICAS = {
+  type: 'object',
+  properties: { dicas: { type: 'array', items: { type: 'string' } } },
+  required: ['dicas'],
+  additionalProperties: false,
+};
+
+const PARADAS_INVALIDAS = new Set(['max_tokens', 'refusal']);
 
 export function resumirParaIa(indicadores, projecao) {
   return {
@@ -18,7 +27,8 @@ export function resumirParaIa(indicadores, projecao) {
 
 export function lerDicas(texto) {
   const limpo = texto.trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
-  const lista = JSON.parse(limpo);
+  const bruto = JSON.parse(limpo);
+  const lista = Array.isArray(bruto) ? bruto : bruto?.dicas;
   if (!Array.isArray(lista)) throw new Error('resposta da IA não é uma lista');
   return lista
     .filter((t) => typeof t === 'string' && t.trim() !== '')
@@ -39,6 +49,7 @@ export async function gerarDicasIa(resumo, {
     body: JSON.stringify({
       model: modelo,
       max_tokens: 400,
+      output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA_DICAS } },
       system: INSTRUCAO,
       messages: [{ role: 'user', content: JSON.stringify(resumo) }],
     }),
@@ -46,7 +57,10 @@ export async function gerarDicasIa(resumo, {
   });
   if (!resposta.ok) throw new Error(`serviço de IA respondeu ${resposta.status}`);
   const corpo = await resposta.json();
-  return lerDicas(corpo.content?.[0]?.text ?? '');
+  if (PARADAS_INVALIDAS.has(corpo.stop_reason)) throw new Error(`resposta da IA interrompida (${corpo.stop_reason})`);
+  const texto = corpo.content?.find((bloco) => bloco.type === 'text')?.text;
+  if (!texto) throw new Error('resposta da IA sem bloco de texto');
+  return lerDicas(texto);
 }
 
 export async function dicasDaIaOuVazio(resumo, gerar = gerarDicasIa) {

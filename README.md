@@ -142,12 +142,13 @@ Regras de fontes e destinos: o nome é único por usuário **e tipo** (uma conta
 | Indicador | Cálculo | Status |
 |---|---|---|
 | Taxa de poupança | (entradas − saídas do mês) ÷ entradas | ≥ 10% bom · 5% a 10% atenção · < 5% (ou negativa) alerta |
-| Comprometimento com cartões | soma das 3 próximas faturas de todos os cartões (a atual aberta + 2) ÷ renda do mês | ≤ 30% bom · ≤ 70% atenção · > 70% alerta |
+| Comprometimento com cartões | soma das 3 primeiras faturas a pagar de cada cartão ÷ renda do mês: a atual aberta + 2, ou, entre o fechamento e o vencimento, a fatura fechada que ainda vence + a atual + 1 | ≤ 30% bom · ≤ 70% atenção · > 70% alerta |
 | Reserva de emergência | saldo das contas marcadas como `reserva` (entradas − saídas nelas, até hoje) ÷ despesa mensal média | ≥ 3 meses bom · ≥ 2 atenção · < 2 alerta |
 | Parcelas futuras | soma das saídas parceladas com data depois do mês corrente; a mensagem diz até que mês | sempre `info` |
 | Regra 50/30/20 | necessidades, desejos e poupança em % da renda | dentro da meta (≤ 50 / ≤ 30 / ≥ 20) bom · 1 fora atenção · 2 ou 3 fora alerta |
-| Categoria fora da curva | maior alta de uma categoria sobre o mês anterior | < 10% bom · ≥ 10% atenção · ≥ 30% alerta |
+| Categoria fora da curva | maior alta do gasto do mês corrente (até hoje) sobre o mês anterior inteiro | < 10% bom · ≥ 10% atenção · ≥ 30% alerta |
 
+- **Categoria fora da curva é parcial até o fim do mês**: o mês corrente, ainda em andamento, é comparado com o anterior inteiro. No começo do mês quase toda categoria aparece com variação negativa (`bom`), e o indicador, assim como a dica `fora_da_curva`, só fica fiel perto do fim do mês. Quando há alta relevante (`atencao`/`alerta`), o `titulo` leva a categoria ("Alimentação fora da curva"); nos demais casos ele é "Categoria fora da curva".
 - **Despesa mensal média**: média das saídas dos 3 meses anteriores que tiveram movimento; sem histórico, usa o mês corrente. A renda média da projeção segue a mesma regra.
 - **Necessidades** na 50/30/20: categorias cujo nome (sem acento e maiúsculas) é moradia, alimentação, saúde, educação, mobilidade, transporte, aluguel, condomínio, mercado, supermercado, contas ou impostos. Todo o resto é "desejos". A poupança é o que sobra da renda e nunca passa de 0% para baixo.
 - **Fora da curva**: só compara categorias que tiveram pelo menos R$ 50,00 no mês anterior (evita "+900%" sobre centavos).
@@ -156,5 +157,5 @@ Regras de fontes e destinos: o nome é único por usuário **e tipo** (uma conta
 
 **Limites e referências.** As metas (10% de poupança, 3 a 6 meses de reserva, 50/30/20) são referências educativas comuns, não recomendação financeira; por isso a resposta sempre traz `aviso`. Limitações: a projeção é uma extrapolação do passado recente (não prevê aumento de salário, férias nem compras futuras à vista); a reserva só considera lançamentos feitos na própria conta de reserva (uma transferência registrada como saída de outra conta não aparece lá); e as saídas no cartão contam na data da compra (ou da parcela), não no pagamento da fatura.
 
-**Dicas por IA (opcional).** Se `ANTHROPIC_API_KEY` estiver no `.env` (modelo em `IA_MODELO`, padrão `claude-haiku-5-5`), até 2 dicas extras da IA vêm depois das dicas por regras, com `origem: "ia"`. Só saem do servidor o `id`, o `status` e o `valor` de cada indicador: nenhum nome, e-mail, CPF, descrição de lançamento ou nome de conta/cartão. A chamada tem limite de 4 s e, em qualquer falha (sem chave, rede, tempo esgotado, erro do serviço, resposta fora do formato), a rota segue normalmente só com as dicas por regras e registra um aviso no log do servidor.
+**Dicas por IA (opcional).** Se `ANTHROPIC_API_KEY` estiver no `.env` (modelo em `IA_MODELO`, padrão `claude-haiku-5-5`), até 2 dicas extras da IA vêm depois das dicas por regras, com `origem: "ia"`. Só saem do servidor o `id`, o `status` e o `valor` de cada indicador: nenhum nome, e-mail, CPF, descrição de lançamento ou nome de conta/cartão. A chamada usa esforço baixo e saída estruturada (JSON `{ "dicas": [...] }`), lê o texto no bloco do tipo `text` (podem vir blocos de `thinking` antes) e tem limite de 4 s e, em qualquer falha (sem chave, rede, tempo esgotado, erro do serviço, resposta fora do formato), a rota segue normalmente só com as dicas por regras e registra um aviso no log do servidor.
 

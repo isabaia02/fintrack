@@ -145,6 +145,23 @@ describe('GET /api/saude-financeira (integração com Postgres)', { skip: pular 
     assert.equal(corpo.projecao.fica_negativo, false);
   });
 
+  test('a reserva ignora lançamento de outro usuário que aponta para a conta de reserva', async () => {
+    const hoje = hojeIso();
+    const dono = await novoUsuario();
+    const intruso = await novoUsuario();
+    const moradia = await dono.cat('Moradia', 'saida', 1);
+    const conta = await dono.fonte('Conta corrente', 'conta');
+    const reserva = await dono.fonte('Poupança', 'conta', { reserva: true });
+    await lancar(dono, { tipo: 'saida', valor: 1000, data: `${somarMeses(hoje, -1).slice(0, 7)}-10`, categoria: moradia, fonte: conta });
+    // O banco só liga o lançamento à fonte pelo id: nada impede esta linha, e a consulta precisa descartá-la.
+    const categoriaIntruso = await intruso.cat('Salário', 'entrada', 7);
+    await lancar(intruso, { tipo: 'entrada', valor: 5000, data: `${hoje.slice(0, 7)}-01`, categoria: categoriaIntruso, fonte: reserva });
+
+    const app = await subir();
+    const corpo = await (await pedir(app, dono.token)).json();
+    assert.equal(corpo.indicadores.find((i) => i.id === 'reserva_emergencia').valor, 0);
+  });
+
   test('não mistura dados de outro usuário', async () => {
     const hoje = hojeIso();
     const a = await novoUsuario();
