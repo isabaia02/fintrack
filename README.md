@@ -58,7 +58,7 @@ TEST_DATABASE_URL=postgresql://localhost:5432/fintrack_test npm test
 ```
 
 ## Rotas
-Implementadas até agora: `GET /api/health`, `POST /api/auth/cadastro`, `POST /api/auth/login` (limite de tentativas; ajustável por `LOGIN_RATE_LIMIT_MAX`) e `GET /api/auth/me` (requer `Authorization: Bearer <token>`), além do CRUD de `/api/categorias` e de `/api/fontes-destinos` (`GET`/`POST` e `PUT`/`DELETE` em `/:id`, todos autenticados) e de `/api/lancamentos` (`GET`/`POST`, `GET`/`PUT`/`PATCH` em `/:id` e `DELETE /:id[?todasParcelas=true]`). As demais (relatórios) seguem a tabela 10.5 do enunciado e serão adicionadas.
+Implementadas até agora: `GET /api/health`, `POST /api/auth/cadastro`, `POST /api/auth/login` (limite de tentativas; ajustável por `LOGIN_RATE_LIMIT_MAX`) e `GET /api/auth/me` (requer `Authorization: Bearer <token>`), além do CRUD de `/api/categorias` e de `/api/fontes-destinos` (`GET`/`POST` e `PUT`/`DELETE` em `/:id`, todos autenticados) e de `/api/lancamentos` (`GET`/`POST`, `GET`/`PUT`/`PATCH` em `/:id` e `DELETE /:id[?todasParcelas=true]`), e os relatórios `GET /api/relatorios/categorias` e `GET /api/relatorios/fontes-destinos`. A previsão de faturas (`/api/relatorios/faturas`) segue a tabela 10.5 do enunciado e será adicionada.
 
 ### Lançamentos e parcelamento
 - Corpo: `{ tipo, valor, descricao, data (AAAA-MM-DD), categoriaId, fonteDestinoId, parcelas? }`. A categoria e a fonte/destino precisam ser do usuário e a categoria precisa ter o mesmo tipo do lançamento. Erros vêm por campo em `{ erro, campos }` (ex.: `campos.valor`, `campos.categoriaId`), todos de uma vez.
@@ -83,6 +83,14 @@ Regras de fontes e destinos: o nome é único por usuário **e tipo** (uma conta
 - Resposta: `{ periodo, periodoAnterior, saidas, entradas }`. `saidas` e `entradas` trazem `total`, `totalAnterior`, `variacaoPercentual` e `categorias`, em ordem decrescente de total. Cada categoria tem `id`, `nome`, `cor`, `total`, `percentual` (sobre o total do seu tipo, 2 casas), `totalAnterior` e `variacaoPercentual` (1 casa; `0` sem variação e `null` quando não havia valor no período anterior).
 - As somas são feitas no banco com `GROUP BY`/`SUM`. Categorias que só tiveram valor no período anterior aparecem com `total` 0.
 - **Período anterior:** quando o filtro cobre meses inteiros, compara com a mesma quantidade de meses imediatamente antes (outubro → setembro; jan–mar → out–dez). Nos demais casos, usa a mesma quantidade de dias logo antes do `inicio` (10–19/10 → 30/09–09/10).
+
+### Relatório por fonte/destino
+- `GET /api/relatorios/fontes-destinos?inicio=AAAA-MM-DD&fim=AAAA-MM-DD`. Sem `inicio`/`fim` vale o mês corrente; período inválido devolve `400` com `campos`.
+- Resposta: `{ periodo, entradas: { total, fontes }, saidas: { total, destinos }, contas, saldoContas }`.
+- `fontes` e `destinos` trazem `{ id, nome, tipo, total }` em ordem decrescente de total, só com quem teve movimento no período. A separação é pelo **tipo do lançamento**, não pelo tipo da fonte/destino: uma entrada lançada num cartão (estorno) aparece em `fontes` com `tipo: "cartao_credito"`, e uma saída lançada numa renda aparece em `destinos` com `tipo: "renda"`. O relatório não filtra esses casos; o `tipo` vai na resposta para o front decidir como exibir.
+- `contas` lista todas as fontes/destinos do tipo conta, em ordem alfabética, com `{ id, nome, reserva, entradas, saidas, saldo }`. `saldoContas` é a soma desses saldos. A mesma rota alimenta o "Saldo por conta" do Resumo e da lista de Fontes e destinos.
+- **`saldo` é o movimento da conta no período**: entradas − saídas lançadas *naquela conta* entre `inicio` e `fim` (contas sem movimento aparecem zeradas). Não é saldo acumulado e não inclui o que foi lançado em fontes do tipo renda, porque o modelo não liga uma renda a uma conta. Por isso `saldoContas` só coincide com o saldo do mês (`totais.saldo` de `/lancamentos`) quando todas as entradas e saídas do período foram lançadas em contas. Ex.: salário de 6.800 na renda "Salário", e 550 de entrada e 1.750 de saída na Conta corrente → Conta corrente com `saldo` −1.200, enquanto o saldo do mês é positivo.
+- As somas e o saldo são calculados no banco com `SUM`, numa única consulta filtrada pelo usuário.
 
 ## Design system (front-end)
 - Tokens do Figma em `frontend/src/index.css`, com modo claro e escuro (`[data-theme="dark"]`). Use as classes do Tailwind (`bg-surface`, `text-text-muted`, `border-border-strong`...), sem cores soltas.
