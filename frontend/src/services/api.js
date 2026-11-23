@@ -14,14 +14,15 @@ let aoNaoAutorizado = () => {};
 export const definirAoNaoAutorizado = (fn) => { aoNaoAutorizado = fn; };
 
 export function tipoDaFalha(erro) {
-  if (!erro.response) return 'sem-conexao';
+  if (!axios.isAxiosError(erro) || axios.isCancel(erro)) return null;
+  if (!erro.response) return erro.request ? 'sem-conexao' : null;
   const { status } = erro.response;
   if (status === 404) return 'nao-encontrado';
   if (status >= 500) return 'erro-servidor';
   return null;
 }
 
-const enviouToken =(erro) => Boolean(erro.config?.headers?.Authorization);
+const enviouToken = (erro) => Boolean(erro.config?.headers?.Authorization);
 
 api.interceptors.response.use(
   (res) => res,
