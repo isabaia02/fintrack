@@ -2,6 +2,8 @@ import { pool } from '../config/db.js';
 import { calcularFatura } from './faturas.js';
 import { somarMeses } from './parcelamento.js';
 
+const MESES_ATE_VENCER = 3;
+
 const paraCentavos = (valor) => Math.round(valor * 100);
 const paraReais = (centavos) => centavos / 100;
 
@@ -11,9 +13,10 @@ export function montarFaturas({ cartoes, lancamentos, hoje, meses }) {
   return cartoes.map((cartao) => {
     const regra = { diaFechamento: cartao.dia_fechamento, diaVencimento: cartao.dia_vencimento };
     const faturas = new Map();
-    for (let i = 0; i <= meses; i += 1) {
-      const fatura = calcularFatura(hoje, regra, i + 1);
-      faturas.set(fatura.referencia, { ...fatura, aberta: i === 0, itens: [], centavos: 0 });
+    const fechadaPendente = calcularFatura(hoje, regra, 0).vencimento >= hoje;
+    for (let k = fechadaPendente ? 0 : 1; k <= meses + 1; k += 1) {
+      const fatura = calcularFatura(hoje, regra, k);
+      faturas.set(fatura.referencia, { ...fatura, aberta: k === 1, itens: [], centavos: 0 });
     }
 
     let utilizado = 0;
@@ -71,7 +74,7 @@ export async function buscarFaturas(usuarioId, { meses, hoje }) {
      FROM lancamentos
      WHERE usuario_id = $1 AND tipo = 'saida' AND fonte_destino_id = ANY($2::int[]) AND data >= $3
      ORDER BY data, id`,
-    [usuarioId, cartoes.map((c) => c.id), somarMeses(hoje, -3)],
+    [usuarioId, cartoes.map((c) => c.id), somarMeses(hoje, -MESES_ATE_VENCER)],
   );
 
   return montarFaturas({ cartoes, lancamentos, hoje, meses });

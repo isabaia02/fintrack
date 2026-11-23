@@ -103,16 +103,63 @@ test('o limite utilizado conta parcelas além da janela exibida e ignora as de f
   assert.equal(visa.limite_utilizado, 3772); // parcelas 1 e 2 do notebook (fatura 10/2026 e 11/2026) já venceram
 });
 
-test('a fatura já fechada e ainda não vencida compromete o limite, mas não aparece na lista', () => {
+test('a fatura já fechada e ainda não vencida aparece antes da atual (aberta: false) e compromete o limite', () => {
   // 28/12/2026: a fatura que fechou em 25/12 vence só em 05/01/2027; a aberta passa a ser a que fecha em 25/01.
   const [visa] = montarFaturas({ cartoes: [cartaoVisa], lancamentos: lancamentosVisa, hoje: '2026-12-28', meses: 1 });
-  assert.deepEqual(visa.faturas.map((f) => f.referencia), ['02/2027', '03/2027']);
-  assert.equal(visa.faturas[0].aberta, true);
+  assert.deepEqual(visa.faturas.map((f) => [f.referencia, f.aberta, f.total]), [
+    ['01/2027', false, 483.33],
+    ['02/2027', true, 483.33],
+    ['03/2027', false, 450],
+  ]);
   // notebook 4..10 (7 × 450) + cabo 2/3 e 3/3 (66,66); o cinema e as parcelas de novembro já venceram
   assert.equal(visa.limite_utilizado, 3150 + 66.66);
 });
 
-test('fatura sem itens devolve itens vazios e total 0 (Nubank sem lançamentos)', () => {
+test('entre o fechamento e o vencimento, a fatura a pagar continua na lista com o valor que pesa no limite', () => {
+  const lancamentos = [parcela(1, 1, 'Notebook', '2026-11-20', 450, 1, 1)];
+  const consultar = (hoje) => montarFaturas({ cartoes: [cartaoVisa], lancamentos, hoje, meses: 1 })[0];
+
+  // 26/11: a fatura que fechou em 25/11 vence em 05/12
+  const fechada = consultar('2026-11-26');
+  assert.deepEqual(fechada.faturas.map((f) => [f.referencia, f.aberta, f.total]), [
+    ['12/2026', false, 450],
+    ['01/2027', true, 0],
+    ['02/2027', false, 0],
+  ]);
+  assert.equal(fechada.limite_utilizado, 450);
+
+  // no dia do vencimento ela ainda é devida; no dia seguinte sai da lista e do limite
+  assert.deepEqual(consultar('2026-12-05').faturas.map((f) => f.referencia), ['12/2026', '01/2027', '02/2027']);
+  const paga = consultar('2026-12-06');
+  assert.deepEqual(paga.faturas.map((f) => f.referencia), ['01/2027', '02/2027']);
+  assert.equal(paga.limite_utilizado, 0);
+});
+
+test('exemplo do design: Nubank em 22/11/2026 tem fatura aberta 12/2026 = 361,30 e as 3 próximas vazias', () => {
+  const nubank = { id: 2, nome: 'Nubank', dia_fechamento: 3, dia_vencimento: 10, limite: 8000 };
+  const lancamentos = [
+    parcela(1, 2, 'Supermercado', '2026-11-06', 312.4, 1, 1),
+    parcela(2, 2, 'Uber', '2026-11-08', 48.9, 1, 1),
+  ];
+  const [resultado] = montarFaturas({ cartoes: [nubank], lancamentos, hoje: '2026-11-22', meses: 3 });
+
+  assert.deepEqual(resultado.faturas.map((f) => [f.referencia, f.total, f.aberta]), [
+    ['12/2026', 361.3, true],
+    ['01/2027', 0, false],
+    ['02/2027', 0, false],
+    ['03/2027', 0, false],
+  ]);
+  assert.deepEqual(
+    [resultado.faturas[0].fechamento, resultado.faturas[0].vencimento],
+    ['2026-12-03', '2026-12-10'],
+  );
+  assert.deepEqual(resultado.faturas[0].itens.map((i) => [i.descricao, i.valor]), [['Supermercado', 312.4], ['Uber', 48.9]]);
+  assert.ok(resultado.faturas.slice(1).every((f) => f.itens.length === 0));
+  assert.equal(resultado.limite_utilizado, 361.3);
+  assert.equal(resultado.limite_disponivel, 7638.7);
+});
+
+test('cartão sem lançamentos devolve faturas com itens vazios e total 0', () => {
   const nubank = { id: 2, nome: 'Nubank', dia_fechamento: 3, dia_vencimento: 10, limite: 8000 };
   const [resultado] = montarFaturas({ cartoes: [nubank], lancamentos: lancamentosVisa, hoje: '2026-11-22', meses: 3 });
 
@@ -131,8 +178,10 @@ test('compra feita no dia do fechamento entra na fatura do mês seguinte', () =>
 
 test('hoje no dia do fechamento: a fatura aberta já é a do mês seguinte', () => {
   const [visa] = montarFaturas({ cartoes: [cartaoVisa], lancamentos: [], hoje: '2026-11-25', meses: 0 });
-  assert.equal(visa.faturas[0].referencia, '01/2027');
-  assert.equal(visa.faturas[0].fechamento, '2026-12-25');
+  const aberta = visa.faturas.filter((f) => f.aberta);
+  assert.equal(aberta.length, 1);
+  assert.equal(aberta[0].referencia, '01/2027');
+  assert.equal(aberta[0].fechamento, '2026-12-25');
 });
 
 test('lançamentos de outro cartão não entram, e a soma é feita em centavos', () => {

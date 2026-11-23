@@ -92,15 +92,8 @@ Regras de fontes e destinos: o nome é único por usuário **e tipo** (uma conta
 - **`saldo` é o movimento da conta no período**: entradas − saídas lançadas *naquela conta* entre `inicio` e `fim` (contas sem movimento aparecem zeradas). Não é saldo acumulado e não inclui o que foi lançado em fontes do tipo renda, porque o modelo não liga uma renda a uma conta. Por isso `saldoContas` só coincide com o saldo do mês (`totais.saldo` de `/lancamentos`) quando todas as entradas e saídas do período foram lançadas em contas. Ex.: salário de 6.800 na renda "Salário", e 550 de entrada e 1.750 de saída na Conta corrente → Conta corrente com `saldo` −1.200, enquanto o saldo do mês é positivo.
 - As somas e o saldo são calculados no banco com `SUM`, numa única consulta filtrada pelo usuário.
 
-## Design system (front-end)
-- Tokens do Figma em `frontend/src/index.css`, com modo claro e escuro (`[data-theme="dark"]`). Use as classes do Tailwind (`bg-surface`, `text-text-muted`, `border-border-strong`...), sem cores soltas.
-- Componentes base em `frontend/src/components/ui`: `Button`, `Badge`, `Input`, `Select`, `Segmentado` e `MoneyText`.
-- Ícones: Material Icons (Outlined) com `<Icone nome="add" />`, usando o nome do ícone do Figma.
-- Foco inicial em `Gaveta` e `Dialogo`: marque o campo com `data-autofocus` (não `autoFocus`). O `autoFocus` do React roda antes de o `<dialog>` abrir e o foco acaba no botão "Fechar".
-- Fechamento de `Gaveta` e `Dialogo` (`useDialogoNativo`): Esc e clique fora não fecham o `<dialog>` direto; chamam `aoFechar` e quem usa o componente decide (ex.: a gaveta de lançamento pergunta "Descartar alterações?"). Se o navegador fechar mesmo assim (alguns ignoram o cancelamento no Esc repetido), o diálogo é reaberto e `aoFechar` é chamado, para o estado do React e o do DOM não se desencontrarem. Com `bloqueada`, nada fecha.
-
 ### Faturas de cartão
-`GET /api/relatorios/faturas?meses=3` devolve, para cada cartão de crédito do usuário, a fatura atual (aberta) e as `meses` seguintes (padrão 3, de 0 a 24; valor inválido dá `400` em `campos.meses`):
+`GET /api/relatorios/faturas?meses=3` devolve, para cada cartão de crédito do usuário, a fatura atual (aberta) e as `meses` seguintes, precedidas pela fatura já fechada e ainda não vencida, quando houver (padrão 3, de 0 a 24; valor inválido dá `400` em `campos.meses`):
 
 ```jsonc
 { "cartoes": [{
@@ -109,7 +102,7 @@ Regras de fontes e destinos: o nome é único por usuário **e tipo** (uma conta
     "faturas": [{
       "referencia": "12/2026",            // MM/AAAA do vencimento
       "fechamento": "2026-11-25", "vencimento": "2026-12-05",
-      "aberta": true,                     // só a fatura atual
+      "aberta": true,                     // só a fatura atual (a fechada e ainda a pagar vem antes, com false)
       "itens": [{ "id": 7, "descricao": "Notebook", "data": "2026-11-20", "valor": 450, "parcela_atual": 3, "total_parcelas": 10 }],
       "total": 555.34                     // fatura sem itens: "itens": [], "total": 0
     }]
@@ -117,6 +110,13 @@ Regras de fontes e destinos: o nome é único por usuário **e tipo** (uma conta
 ```
 
 - **O que guardamos: a data da parcela.** Nem a data da compra repetida em todas as parcelas, nem a data da fatura: cada parcela é um lançamento com a própria `data` = data da compra + (k − 1) meses (ex.: compra em 20/09 em 10× → 20/09, 20/10, 20/11…). A fatura de cada lançamento sai de `calcularFatura(data, cartao)`, tratando a data da parcela como uma compra, então a regra de fechamento (compra no dia do fechamento cai na fatura do mês seguinte) vale para todas as parcelas. A vantagem é que editar a data de uma parcela só muda a fatura dela. Limitação: se o dia da compra for 29–31 e o fechamento for depois dele, uma parcela em mês curto (fevereiro) pode cair na fatura seguinte, porque o dia 29–31 já foi ajustado ao gravar a parcela.
-- **Fatura atual** é a que recebe uma compra feita hoje (`calcularFatura(hoje)`); a fatura já fechada e ainda não vencida não aparece na lista, mas compromete o limite.
+- **Fatura atual** é a que recebe uma compra feita hoje (`calcularFatura(hoje)`) e é a única com `aberta: true`. Entre o fechamento e o vencimento, a fatura que acabou de fechar (vencimento ≥ hoje) vem na lista antes da atual, com `aberta: false`, para a tela mostrar o valor que ainda precisa ser pago e que pesa em `limite_utilizado`; no dia seguinte ao vencimento ela sai. Por isso a lista tem `meses + 1` faturas, ou `meses + 2` nesse intervalo.
 - **Limite utilizado** = soma de todas as saídas do cartão cuja fatura ainda não venceu (vencimento ≥ hoje), inclusive as de faturas além da janela exibida. **Limite disponível** = limite − limite utilizado (pode ficar negativo se o limite foi ultrapassado).
 - Só saídas entram na fatura; entradas no cartão (estornos) não são abatidas. "Hoje" é a data no fuso de São Paulo.
+
+## Design system (front-end)
+- Tokens do Figma em `frontend/src/index.css`, com modo claro e escuro (`[data-theme="dark"]`). Use as classes do Tailwind (`bg-surface`, `text-text-muted`, `border-border-strong`...), sem cores soltas.
+- Componentes base em `frontend/src/components/ui`: `Button`, `Badge`, `Input`, `Select`, `Segmentado` e `MoneyText`.
+- Ícones: Material Icons (Outlined) com `<Icone nome="add" />`, usando o nome do ícone do Figma.
+- Foco inicial em `Gaveta` e `Dialogo`: marque o campo com `data-autofocus` (não `autoFocus`). O `autoFocus` do React roda antes de o `<dialog>` abrir e o foco acaba no botão "Fechar".
+- Fechamento de `Gaveta` e `Dialogo` (`useDialogoNativo`): Esc e clique fora não fecham o `<dialog>` direto; chamam `aoFechar` e quem usa o componente decide (ex.: a gaveta de lançamento pergunta "Descartar alterações?"). Se o navegador fechar mesmo assim (alguns ignoram o cancelamento no Esc repetido), o diálogo é reaberto e `aoFechar` é chamado, para o estado do React e o do DOM não se desencontrarem. Com `bloqueada`, nada fecha.

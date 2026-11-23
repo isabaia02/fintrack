@@ -78,6 +78,9 @@ describe('GET /api/relatorios/faturas (integração com Postgres)', { skip: pula
     );
   }
 
+  // Dependendo do dia, a fatura fechada e ainda não vencida vem antes da atual; os testes olham a partir da aberta.
+  const apartirDaAberta = (cartao) => cartao.faturas.slice(cartao.faturas.findIndex((f) => f.aberta));
+
   const consultar = (usuario, consulta = '') =>
     fetch(`${app.url}/api/relatorios/faturas${consulta}`, { headers: { Authorization: `Bearer ${usuario.token}` } })
       .then(async (res) => ({ status: res.status, corpo: await res.json() }));
@@ -104,8 +107,10 @@ describe('GET /api/relatorios/faturas (integração com Postgres)', { skip: pula
     assert.equal(nubank.limite, 8000);
     assert.equal(nubank.limite_utilizado, 0);
     assert.equal(nubank.limite_disponivel, 8000);
-    assert.equal(nubank.faturas.length, 4);
-    assert.deepEqual(nubank.faturas.map((f) => f.aberta), [true, false, false, false]);
+    const faturas = apartirDaAberta(nubank);
+    assert.equal(faturas.length, 4);
+    assert.deepEqual(faturas.map((f) => f.aberta), [true, false, false, false]);
+    assert.equal(nubank.faturas.filter((f) => f.aberta).length, 1);
     for (const fatura of nubank.faturas) {
       assert.deepEqual(fatura.itens, []);
       assert.equal(fatura.total, 0);
@@ -125,12 +130,13 @@ describe('GET /api/relatorios/faturas (integração com Postgres)', { skip: pula
     }
 
     const [visa] = (await consultar(u)).corpo.cartoes;
-    assert.deepEqual(visa.faturas.map((f) => f.total), [150, 100, 100, 0]);
+    const faturas = apartirDaAberta(visa);
+    assert.deepEqual(faturas.map((f) => f.total), [150, 100, 100, 0]);
     assert.deepEqual(
-      visa.faturas[0].itens.map((i) => [i.descricao, i.valor, i.parcela_atual, i.total_parcelas]),
+      faturas[0].itens.map((i) => [i.descricao, i.valor, i.parcela_atual, i.total_parcelas]),
       [['Mercado', 50, 1, 1], ['Notebook', 100, 1, 3]],
     );
-    assert.equal(visa.faturas[1].itens[0].parcela_atual, 2);
+    assert.equal(faturas[1].itens[0].parcela_atual, 2);
     assert.equal(visa.limite_utilizado, 350);
     assert.equal(visa.limite_disponivel, 650);
   });
@@ -139,8 +145,8 @@ describe('GET /api/relatorios/faturas (integração com Postgres)', { skip: pula
     const u = await novoUsuario();
     await novoCartao(u, 'Visa');
 
-    assert.equal((await consultar(u, '?meses=0')).corpo.cartoes[0].faturas.length, 1);
-    assert.equal((await consultar(u, '?meses=6')).corpo.cartoes[0].faturas.length, 7);
+    assert.equal(apartirDaAberta((await consultar(u, '?meses=0')).corpo.cartoes[0]).length, 1);
+    assert.equal(apartirDaAberta((await consultar(u, '?meses=6')).corpo.cartoes[0]).length, 7);
   });
 
   test('compras antigas (já vencidas) e entradas não comprometem o limite', async () => {
@@ -151,7 +157,7 @@ describe('GET /api/relatorios/faturas (integração com Postgres)', { skip: pula
 
     const [visa] = (await consultar(u)).corpo.cartoes;
     assert.equal(visa.limite_utilizado, 0);
-    assert.equal(visa.faturas[0].total, 0);
+    assert.ok(visa.faturas.every((f) => f.total === 0));
   });
 
   test('meses inválido devolve 400 no padrão { erro, campos }', async () => {
