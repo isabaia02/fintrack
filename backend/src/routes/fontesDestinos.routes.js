@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { autenticar } from '../middlewares/autenticar.js';
 import { validarFonteDestino, validarTipoFiltro } from '../middlewares/validarFonteDestino.js';
 import * as FonteDestino from '../models/fonteDestino.js';
-import { idValido } from '../utils/id.js';
+import { exigirIdValido } from '../middlewares/validarId.js';
 
 const router = Router();
 router.use(autenticar);
@@ -38,11 +38,9 @@ router.post('/', validarFonteDestino, async (req, res, next) => {
   }
 });
 
-router.put('/:id', validarFonteDestino, async (req, res, next) => {
-  const id = idValido(req.params.id);
-  if (!id) return res.status(404).json(NAO_ENCONTRADO);
+router.put('/:id', exigirIdValido(NAO_ENCONTRADO), validarFonteDestino, async (req, res, next) => {
   try {
-    const resultado = await FonteDestino.atualizar(req.usuarioId, id, req.dadosFonteDestino);
+    const resultado = await FonteDestino.atualizar(req.usuarioId, req.idRecurso, req.dadosFonteDestino);
     if (resultado.naoEncontrada) return res.status(404).json(NAO_ENCONTRADO);
     if (resultado.tipoBloqueado) {
       return res.status(409).json({
@@ -64,11 +62,9 @@ router.put('/:id', validarFonteDestino, async (req, res, next) => {
   }
 });
 
-router.delete('/:id', async (req, res, next) => {
-  const id = idValido(req.params.id);
-  if (!id) return res.status(404).json(NAO_ENCONTRADO);
+router.delete('/:id', exigirIdValido(NAO_ENCONTRADO), async (req, res, next) => {
   try {
-    const resultado = await FonteDestino.excluir(req.usuarioId, id);
+    const resultado = await FonteDestino.excluir(req.usuarioId, req.idRecurso);
     if (resultado.naoEncontrada) return res.status(404).json(NAO_ENCONTRADO);
     if (resultado.bloqueadaPor) {
       return res.status(409).json({

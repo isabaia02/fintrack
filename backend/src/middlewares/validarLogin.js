@@ -1,4 +1,4 @@
-import { normalizarEmail, texto } from '../utils/texto.js';
+import { normalizarEmail, temControle, texto } from '../utils/texto.js';
 
 export function validarLogin(req, res, next) {
   const corpo = req.body ?? {};
@@ -7,6 +7,7 @@ export function validarLogin(req, res, next) {
   const campos = {};
 
   if (!email) campos.email = 'Informe o e-mail.';
+  else if (temControle(email) || email.length > 160) campos.email = 'Informe um e-mail válido.';
   if (!senha) campos.senha = 'Informe a senha.';
 
   if (Object.keys(campos).length) {

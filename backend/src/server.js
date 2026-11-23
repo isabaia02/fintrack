@@ -1,18 +1,10 @@
 import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
-import rotas from './routes/index.js';
-import { naoEncontrado, tratarErros } from './middlewares/erros.js';
+import { criarApp } from './app.js';
+import { validarAmbiente } from './config/ambiente.js';
 
-const app = express();
+const { origens, avisos, trustProxy } = validarAmbiente();
+avisos.forEach((aviso) => console.warn(`[aviso] ${aviso}`));
 
-app.use(cors({ origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173' }));
-app.use(express.json());
-
-app.use('/api', rotas);
-
-app.use(naoEncontrado);
-app.use(tratarErros);
-
+const app = criarApp({ origens, trustProxy });
 const porta = process.env.PORT ?? 3000;
 app.listen(porta, () => console.log(`API rodando em http://localhost:${porta}`));

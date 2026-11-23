@@ -1,0 +1,670 @@
+###############################################################################
+# FinTrack — roteiro de verificação da API (segurança, isolamento e parcelamento)
+#
+# Formato: httpyac (extensão "httpyac" do VS Code ou CLI). Rodar tudo de uma vez:
+#   npx httpyac send docs/roteiro-seguranca.http --all
+# Cada requisição tem uma asserção "?? ..." com o resultado esperado; no fim a
+# CLI mostra quantas passaram. (A extensão REST Client NÃO é compatível com a
+# sintaxe de variáveis/asserções usada aqui.)
+#
+# Pré-requisitos:
+#   cd backend && npm run db:schema && npm run db:seed && npm run dev
+#   (API em http://localhost:3000; usuários do seed: ana@email.com e
+#    bruno@email.com, senha "senha1234")
+#
+# Como usar: execute as requisições NA ORDEM (a CLI já faz isso; na extensão,
+# use "Send All"). Cada bloco traz o resultado esperado em "ESPERADO".
+# Ana = usuário A (dona dos dados) | Bruno = usuário B (o "invasor").
+###############################################################################
+
+@api = http://localhost:3000/api
+@json = application/json
+
+###############################################################################
+# 0. Sanidade
+###############################################################################
+
+### 0.1 Health check
+# ESPERADO: 200 {"status":"ok"}
+GET {{api}}/health
+
+?? status == 200
+
+###############################################################################
+# 1. CADASTRO — sucesso, duplicidade (e-mail / CPF) e validação
+###############################################################################
+
+### 1.1 Cadastro válido (usuário novo)
+# ESPERADO: 201 com {id, nome, email} — nunca devolve senha nem hash.
+# E-mail e CPF (válido) são gerados a cada execução, então o roteiro pode ser
+# repetido sem recriar o banco.
+{{
+  const d = Array.from({ length: 9 }, () => Math.floor(Math.random() * 10));
+  const dv = (n) => { let t = 0; for (let i = 0; i < n; i++) t += d[i] * (n + 1 - i); const r = (t * 10) % 11; return r === 10 ? 0 : r; };
+  d.push(dv(9)); d.push(dv(10));
+  exports.cpfNovo = d.join('');
+  exports.emailNovo = `carla.${Date.now()}@email.com`;
+}}
+POST {{api}}/auth/cadastro
+Content-Type: {{json}}
+
+{
+  "nome": "Carla Demo",
+  "email": "{{emailNovo}}",
+  "cpf": "{{cpfNovo}}",
+  "senha": "senha1234",
+  "confirmarSenha": "senha1234"
+}
+
+?? status == 201
+
+### 1.2 Cadastro com E-MAIL duplicado (e-mail da Ana, CPF diferente e válido)
+# ESPERADO: 409
+#   {"erro":"Usuário já cadastrado.",
+#    "campos":{"email":"Já existe um usuário com este e-mail."}}
+POST {{api}}/auth/cadastro
+Content-Type: {{json}}
+
+{
+  "nome": "Outra Pessoa",
+  "email": "ana@email.com",
+  "cpf": "123.456.789-09",
+  "senha": "senha1234"
+}
+
+?? status == 409
+?? js response.parsedBody.campos.email exists
+
+### 1.3 Cadastro com CPF duplicado (CPF da Ana, e-mail diferente)
+# ESPERADO: 409
+#   {"erro":"Usuário já cadastrado.",
+#    "campos":{"cpf":"Já existe um usuário com este CPF."}}
+POST {{api}}/auth/cadastro
+Content-Type: {{json}}
+
+{
+  "nome": "Outra Pessoa",
+  "email": "outra.pessoa@email.com",
+  "cpf": "529.982.247-25",
+  "senha": "senha1234"
+}
+
+?? status == 409
+?? js response.parsedBody.campos.cpf exists
+
+### 1.4 Cadastro com e-mail duplicado em outra caixa (normalização)
+# ESPERADO: 409 com campos.email — o e-mail é normalizado antes de comparar.
+POST {{api}}/auth/cadastro
+Content-Type: {{json}}
+
+{
+  "nome": "Outra Pessoa",
+  "email": "  ANA@Email.com ",
+  "cpf": "123.456.789-09",
+  "senha": "senha1234"
+}
+
+?? status == 409
+?? js response.parsedBody.campos.email exists
+
+### 1.5 Cadastro com dados inválidos (CPF inválido, senha fraca, e-mail malformado)
+# ESPERADO: 400 {"erro":"Dados inválidos.","campos":{email, cpf, senha}}
+#   todos os erros vêm de uma vez, por campo.
+POST {{api}}/auth/cadastro
+Content-Type: {{json}}
+
+{
+  "nome": "Fulano",
+  "email": "isso-nao-e-email",
+  "cpf": "123.456.789-00",
+  "senha": "abc"
+}
+
+?? status == 400
+?? js response.parsedBody.campos.email exists
+?? js response.parsedBody.campos.cpf exists
+?? js response.parsedBody.campos.senha exists
+
+###############################################################################
+# 2. LOGIN
+###############################################################################
+
+### 2.1 Login da Ana (usuário A)
+# ESPERADO: 200 {"token":"<jwt>","usuario":{id,nome,email}} — sem senha_hash.
+# @name loginA
+POST {{api}}/auth/login
+Content-Type: {{json}}
+
+{
+  "email": "ana@email.com",
+  "senha": "senha1234"
+}
+
+?? status == 200
+?? js response.parsedBody.token exists
+
+### 2.2 Login do Bruno (usuário B)
+# ESPERADO: 200 com outro token.
+# @name loginB
+POST {{api}}/auth/login
+Content-Type: {{json}}
+
+{
+  "email": "bruno@email.com",
+  "senha": "senha1234"
+}
+
+?? status == 200
+
+### 2.3 Login com senha errada
+# ESPERADO: 401 {"erro":"E-mail ou senha inválidos."}
+POST {{api}}/auth/login
+Content-Type: {{json}}
+
+{
+  "email": "ana@email.com",
+  "senha": "senha-errada-123"
+}
+
+?? status == 401
+
+### 2.4 Login com e-mail inexistente
+# ESPERADO: 401 com a MESMA mensagem de 2.3 — não revela se o e-mail existe.
+POST {{api}}/auth/login
+Content-Type: {{json}}
+
+{
+  "email": "ninguem@email.com",
+  "senha": "senha1234"
+}
+
+?? status == 401
+
+### 2.5 Login sem campos
+# ESPERADO: 400 {"erro":"Dados inválidos.","campos":{"email":..., "senha":...}}
+POST {{api}}/auth/login
+Content-Type: {{json}}
+
+{}
+
+?? status == 400
+
+### 2.6 Rota protegida com token válido
+# ESPERADO: 200 {id, nome, email} da Ana.
+GET {{api}}/auth/me
+Authorization: Bearer {{loginA.token}}
+
+# Limite de tentativas (não incluído como requisição para não bloquear o
+# restante do roteiro): após 10 logins falhos em 15 min (LOGIN_RATE_LIMIT_MAX)
+# o servidor responde 429 {"erro":"Muitas tentativas. Tente novamente em alguns
+# minutos."}. Logins bem-sucedidos não contam para o limite.
+
+?? status == 200
+
+###############################################################################
+# 3. ACESSO SEM TOKEN (401)
+###############################################################################
+
+### 3.1 Listar lançamentos sem Authorization
+# ESPERADO: 401 {"erro":"Token não informado."}
+GET {{api}}/lancamentos
+
+?? status == 401
+
+### 3.2 Listar categorias sem Authorization
+# ESPERADO: 401 {"erro":"Token não informado."}
+GET {{api}}/categorias
+
+?? status == 401
+
+### 3.3 Listar fontes e destinos sem Authorization
+# ESPERADO: 401 {"erro":"Token não informado."}
+GET {{api}}/fontes-destinos
+
+?? status == 401
+
+### 3.4 Saúde financeira sem Authorization
+# ESPERADO: 401 {"erro":"Token não informado."}
+GET {{api}}/saude-financeira
+
+?? status == 401
+
+### 3.5 Relatório sem Authorization
+# ESPERADO: 401 {"erro":"Token não informado."}
+GET {{api}}/relatorios/categorias
+
+?? status == 401
+
+### 3.6 Esquema de autenticação errado (Basic em vez de Bearer)
+# ESPERADO: 401 {"erro":"Token não informado."}
+GET {{api}}/lancamentos
+Authorization: Basic YW5hQGVtYWlsLmNvbTpzZW5oYTEyMzQ=
+
+?? status == 401
+
+### 3.7 Token adulterado / inválido
+# ESPERADO: 401 {"erro":"Token inválido."}
+GET {{api}}/lancamentos
+Authorization: Bearer token.invalido.qualquer
+
+?? status == 401
+
+### 3.8 Criar lançamento sem token
+# ESPERADO: 401 — nada é gravado.
+POST {{api}}/lancamentos
+Content-Type: {{json}}
+
+{
+  "tipo": "saida",
+  "valor": 10,
+  "descricao": "Sem token",
+  "data": "2026-01-10",
+  "categoriaId": 1,
+  "fonteDestinoId": 1
+}
+
+?? status == 401
+
+###############################################################################
+# 4. ISOLAMENTO ENTRE USUÁRIOS — Ana (A) cria, Bruno (B) tenta acessar (404)
+###############################################################################
+
+### 4.1 Categorias de saída da Ana (usa a 1ª como categoria do lançamento)
+# ESPERADO: 200 com a lista de categorias DA ANA (só dela).
+# @name categoriasA
+GET {{api}}/categorias?tipo=saida
+Authorization: Bearer {{loginA.token}}
+
+?? status == 200
+
+### 4.2 Ana cria uma conta (fonte/destino) própria
+# ESPERADO: 201 com a conta criada (id, nome, tipo, total_lancamentos 0).
+# @name contaA
+POST {{api}}/fontes-destinos
+Content-Type: {{json}}
+Authorization: Bearer {{loginA.token}}
+
+{
+  "nome": "Conta Isolamento {{$timestamp}}",
+  "tipo": "conta"
+}
+
+?? status == 201
+
+### 4.3 Ana cria um lançamento
+# ESPERADO: 201 com array de 1 item (compra à vista); anote o "id".
+# @name lancamentoA
+POST {{api}}/lancamentos
+Content-Type: {{json}}
+Authorization: Bearer {{loginA.token}}
+
+{
+  "tipo": "saida",
+  "valor": 99.90,
+  "descricao": "Lançamento privado da Ana",
+  "data": "2026-01-10",
+  "categoriaId": {{categoriasA[0].id}},
+  "fonteDestinoId": {{contaA.id}}
+}
+
+?? status == 201
+
+### 4.4 Ana lê o próprio lançamento
+# ESPERADO: 200 com o lançamento (prova de que ele existe).
+GET {{api}}/lancamentos/{{lancamentoA[0].id}}
+Authorization: Bearer {{loginA.token}}
+
+?? status == 200
+
+### 4.5 Bruno tenta LER o lançamento da Ana
+# ESPERADO: 404 {"erro":"Lançamento não encontrado."}
+# (404 e não 403: a API não confirma sequer que o recurso existe.)
+GET {{api}}/lancamentos/{{lancamentoA[0].id}}
+Authorization: Bearer {{loginB.token}}
+
+?? status == 404
+
+### 4.6 Bruno tenta EDITAR (PUT) o lançamento da Ana
+# ESPERADO: 404 {"erro":"Lançamento não encontrado."} — nada é alterado.
+PUT {{api}}/lancamentos/{{lancamentoA[0].id}}
+Content-Type: {{json}}
+Authorization: Bearer {{loginB.token}}
+
+{
+  "tipo": "saida",
+  "valor": 1,
+  "descricao": "Invadido pelo Bruno",
+  "data": "2026-01-10",
+  "categoriaId": {{categoriasA[0].id}},
+  "fonteDestinoId": {{contaA.id}}
+}
+
+?? status == 404
+
+### 4.7 Bruno tenta EDITAR PARCIALMENTE (PATCH) o lançamento da Ana
+# ESPERADO: 404 {"erro":"Lançamento não encontrado."}
+PATCH {{api}}/lancamentos/{{lancamentoA[0].id}}
+Content-Type: {{json}}
+Authorization: Bearer {{loginB.token}}
+
+{
+  "descricao": "Invadido pelo Bruno"
+}
+
+?? status == 404
+
+### 4.8 Bruno tenta EXCLUIR o lançamento da Ana
+# ESPERADO: 404 {"erro":"Lançamento não encontrado."} — nada é apagado.
+DELETE {{api}}/lancamentos/{{lancamentoA[0].id}}
+Authorization: Bearer {{loginB.token}}
+
+?? status == 404
+
+### 4.9 Bruno lista os lançamentos dele
+# ESPERADO: 200 — a lista NÃO contém o lançamento da Ana (id {{lancamentoA[0].id}})
+# nem a descrição "Lançamento privado da Ana".
+GET {{api}}/lancamentos?inicio=2026-01-01&fim=2026-01-31
+Authorization: Bearer {{loginB.token}}
+
+?? status == 200
+?? js response.parsedBody.itens.some((l) => l.id === lancamentoA[0].id) == false
+?? js response.parsedBody.itens.some((l) => l.descricao === 'Lançamento privado da Ana') == false
+
+### 4.10 Bruno tenta usar a categoria e a conta da Ana ao criar lançamento
+# ESPERADO: 400 {"erro":"Dados inválidos.","campos":{
+#   "categoriaId":"Categoria não encontrada.",
+#   "fonteDestinoId":"Fonte ou destino não encontrado."}}
+POST {{api}}/lancamentos
+Content-Type: {{json}}
+Authorization: Bearer {{loginB.token}}
+
+{
+  "tipo": "saida",
+  "valor": 10,
+  "descricao": "Usando dados da Ana",
+  "data": "2026-01-10",
+  "categoriaId": {{categoriasA[0].id}},
+  "fonteDestinoId": {{contaA.id}}
+}
+
+?? status == 400
+?? js response.parsedBody.campos.categoriaId exists
+?? js response.parsedBody.campos.fonteDestinoId exists
+
+### 4.11 Bruno tenta EDITAR a conta da Ana
+# ESPERADO: 404 {"erro":"Fonte ou destino não encontrado."}
+PUT {{api}}/fontes-destinos/{{contaA.id}}
+Content-Type: {{json}}
+Authorization: Bearer {{loginB.token}}
+
+{
+  "nome": "Conta do Bruno agora",
+  "tipo": "conta"
+}
+
+?? status == 404
+
+### 4.12 Bruno tenta EXCLUIR a conta da Ana
+# ESPERADO: 404 {"erro":"Fonte ou destino não encontrado."}
+DELETE {{api}}/fontes-destinos/{{contaA.id}}
+Authorization: Bearer {{loginB.token}}
+
+?? status == 404
+
+### 4.13 Bruno tenta EDITAR a categoria da Ana
+# ESPERADO: 404 {"erro":"Categoria não encontrada."}
+PUT {{api}}/categorias/{{categoriasA[0].id}}
+Content-Type: {{json}}
+Authorization: Bearer {{loginB.token}}
+
+{
+  "nome": "Categoria roubada"
+}
+
+?? status == 404
+
+### 4.14 Bruno tenta EXCLUIR a categoria da Ana
+# ESPERADO: 404 {"erro":"Categoria não encontrada."}
+DELETE {{api}}/categorias/{{categoriasA[0].id}}
+Authorization: Bearer {{loginB.token}}
+
+?? status == 404
+
+### 4.15 ID malformado
+# ESPERADO: 404 {"erro":"Lançamento não encontrado."} (sem erro 500).
+GET {{api}}/lancamentos/abc
+Authorization: Bearer {{loginA.token}}
+
+?? status == 404
+
+### 4.16 Ana confirma que o lançamento continua intacto
+# ESPERADO: 200 com descricao "Lançamento privado da Ana" e valor 99.9 —
+# as tentativas do Bruno não alteraram nem apagaram nada.
+GET {{api}}/lancamentos/{{lancamentoA[0].id}}
+Authorization: Bearer {{loginA.token}}
+
+?? status == 200
+?? js response.parsedBody.descricao == Lançamento privado da Ana
+?? js response.parsedBody.valor == 99.9
+
+### 4.17 Ana confirma que a conta continua dela
+# ESPERADO: 200 — a conta {{contaA.id}} segue na lista da Ana, com o nome original
+# (o Bruno tentou editá-la e excluí-la em 4.11 e 4.12).
+GET {{api}}/fontes-destinos
+Authorization: Bearer {{loginA.token}}
+
+?? status == 200
+?? js response.parsedBody.some((f) => f.id === contaA.id) == true
+?? js response.parsedBody.some((f) => f.nome === 'Conta do Bruno agora') == false
+
+### 4.18 Ana confirma que a categoria continua dela
+# ESPERADO: 200 — a categoria {{categoriasA[0].id}} segue na lista da Ana, sem o nome
+# "Categoria roubada" (o Bruno tentou editá-la e excluí-la em 4.13 e 4.14).
+GET {{api}}/categorias
+Authorization: Bearer {{loginA.token}}
+
+?? status == 200
+?? js response.parsedBody.some((c) => c.id === categoriasA[0].id) == true
+?? js response.parsedBody.some((c) => c.nome === 'Categoria roubada') == false
+
+###############################################################################
+# 5. COMPRA PARCELADA
+###############################################################################
+
+### 5.1 Ana cria um cartão de crédito
+# ESPERADO: 201 com tipo "cartao_credito", dia_fechamento 10, dia_vencimento 20,
+# limite 5000.
+# @name cartaoA
+POST {{api}}/fontes-destinos
+Content-Type: {{json}}
+Authorization: Bearer {{loginA.token}}
+
+{
+  "nome": "Cartão Roteiro {{$timestamp}}",
+  "tipo": "cartao_credito",
+  "dia_fechamento": 10,
+  "dia_vencimento": 20,
+  "limite": 5000
+}
+
+?? status == 201
+
+### 5.2 Compra parcelada: R$ 100,00 em 3x no cartão
+# ESPERADO: 201 com ARRAY DE 3 lançamentos, no mesmo "grupo_parcelamento":
+#   parcela 1/3 valor 33.34 data 2026-01-15
+#   parcela 2/3 valor 33.33 data 2026-02-15
+#   parcela 3/3 valor 33.33 data 2026-03-15
+# (o resto do centavo vai para a 1ª parcela; "valor" no POST é o total.)
+# @name compraParcelada
+POST {{api}}/lancamentos
+Content-Type: {{json}}
+Authorization: Bearer {{loginA.token}}
+
+{
+  "tipo": "saida",
+  "valor": 100,
+  "descricao": "Compra parcelada do roteiro",
+  "data": "2026-01-15",
+  "categoriaId": {{categoriasA[0].id}},
+  "fonteDestinoId": {{cartaoA.id}},
+  "parcelas": 3
+}
+
+?? status == 201
+?? js response.parsedBody.length == 3
+?? js response.parsedBody[0].valor == 33.34
+?? js response.parsedBody[1].valor == 33.33
+?? js response.parsedBody[2].valor == 33.33
+?? js response.parsedBody.map((p) => p.data).join() == 2026-01-15,2026-02-15,2026-03-15
+?? js new Set(response.parsedBody.map((p) => p.grupo_parcelamento)).size == 1
+
+### 5.3 Ana consulta as parcelas no período
+# ESPERADO: 200; itens com parcela_atual/total_parcelas "1/3", "2/3", "3/3"
+# (cada mês mostra só a parcela daquele mês).
+GET {{api}}/lancamentos?inicio=2026-01-01&fim=2026-03-31&fonteDestinoId={{cartaoA.id}}
+Authorization: Bearer {{loginA.token}}
+
+?? status == 200
+?? js response.parsedBody.itens.length == 3
+?? js response.parsedBody.itens.map((p) => `${p.parcela_atual}/${p.total_parcelas}`).sort().join() == 1/3,2/3,3/3
+
+### 5.4 Bruno tenta ler uma parcela da compra da Ana
+# ESPERADO: 404 {"erro":"Lançamento não encontrado."}
+GET {{api}}/lancamentos/{{compraParcelada[0].id}}
+Authorization: Bearer {{loginB.token}}
+
+?? status == 404
+
+### 5.5 Bruno tenta excluir TODAS as parcelas da compra da Ana
+# ESPERADO: 404 {"erro":"Lançamento não encontrado."} — compra intacta.
+DELETE {{api}}/lancamentos/{{compraParcelada[0].id}}?todasParcelas=true
+Authorization: Bearer {{loginB.token}}
+
+?? status == 404
+
+### 5.6 Parcelamento em conta (não cartão) é recusado
+# ESPERADO: 400 {"campos":{"parcelas":"O parcelamento só está disponível para
+#   saídas no cartão de crédito."}}
+POST {{api}}/lancamentos
+Content-Type: {{json}}
+Authorization: Bearer {{loginA.token}}
+
+{
+  "tipo": "saida",
+  "valor": 100,
+  "descricao": "Parcelado em conta",
+  "data": "2026-01-15",
+  "categoriaId": {{categoriasA[0].id}},
+  "fonteDestinoId": {{contaA.id}},
+  "parcelas": 3
+}
+
+?? status == 400
+?? js response.parsedBody.campos.parcelas exists
+
+### 5.7 Número de parcelas fora do limite (máximo 48)
+# ESPERADO: 400 {"campos":{"parcelas":"O número de parcelas deve ser um
+#   inteiro de 1 a 48."}}
+POST {{api}}/lancamentos
+Content-Type: {{json}}
+Authorization: Bearer {{loginA.token}}
+
+{
+  "tipo": "saida",
+  "valor": 100,
+  "descricao": "Parcelas demais",
+  "data": "2026-01-15",
+  "categoriaId": {{categoriasA[0].id}},
+  "fonteDestinoId": {{cartaoA.id}},
+  "parcelas": 49
+}
+
+?? status == 400
+?? js response.parsedBody.campos.parcelas exists
+
+### 5.8 Valor baixo demais para dividir
+# ESPERADO: 400 {"campos":{"parcelas":"O valor é baixo demais para dividir em
+#   3 parcelas."}} — nada é gravado (transação única).
+POST {{api}}/lancamentos
+Content-Type: {{json}}
+Authorization: Bearer {{loginA.token}}
+
+{
+  "tipo": "saida",
+  "valor": 0.02,
+  "descricao": "Valor mínimo",
+  "data": "2026-01-15",
+  "categoriaId": {{categoriasA[0].id}},
+  "fonteDestinoId": {{cartaoA.id}},
+  "parcelas": 3
+}
+
+?? status == 400
+?? js response.parsedBody.campos.parcelas exists
+
+### 5.9 Ana não pode mudar o número de parcelas depois de criada
+# ESPERADO: 400 {"campos":{"parcelas":"Não é possível alterar o número de
+#   parcelas de um lançamento já cadastrado."}}
+PUT {{api}}/lancamentos/{{compraParcelada[1].id}}
+Content-Type: {{json}}
+Authorization: Bearer {{loginA.token}}
+
+{
+  "tipo": "saida",
+  "valor": 33.33,
+  "descricao": "Compra parcelada do roteiro",
+  "data": "2026-02-15",
+  "categoriaId": {{categoriasA[0].id}},
+  "fonteDestinoId": {{cartaoA.id}},
+  "parcelas": 5
+}
+
+?? status == 400
+?? js response.parsedBody.campos.parcelas exists
+
+### 5.10 Ana exclui só a parcela 2 (as demais são renumeradas)
+# ESPERADO: 204 sem corpo. Depois, a consulta 5.10b mostra 2 parcelas: 1/2 e 2/2.
+DELETE {{api}}/lancamentos/{{compraParcelada[1].id}}
+Authorization: Bearer {{loginA.token}}
+
+?? status == 204
+
+### 5.10b As parcelas restantes foram renumeradas
+# ESPERADO: 200; itens 1/2 (2026-01-15) e 2/2 (2026-03-15): a compra agora tem 2 parcelas.
+GET {{api}}/lancamentos?inicio=2026-01-01&fim=2026-03-31&fonteDestinoId={{cartaoA.id}}
+Authorization: Bearer {{loginA.token}}
+
+?? status == 200
+?? js response.parsedBody.itens.map((p) => `${p.parcela_atual}/${p.total_parcelas}`).sort().join() == 1/2,2/2
+
+### 5.11 Ana exclui TODAS as parcelas restantes da compra
+# ESPERADO: 204 sem corpo; a consulta 5.3 volta vazia (itens: []).
+DELETE {{api}}/lancamentos/{{compraParcelada[0].id}}?todasParcelas=true
+Authorization: Bearer {{loginA.token}}
+
+?? status == 204
+
+###############################################################################
+# 6. LIMPEZA (opcional)
+###############################################################################
+
+### 6.1 Ana exclui o lançamento privado
+# ESPERADO: 204.
+DELETE {{api}}/lancamentos/{{lancamentoA[0].id}}
+Authorization: Bearer {{loginA.token}}
+
+?? status == 204
+
+### 6.2 Ana exclui o cartão do roteiro
+# ESPERADO: 204 (sem lançamentos vinculados após a seção 5).
+DELETE {{api}}/fontes-destinos/{{cartaoA.id}}
+Authorization: Bearer {{loginA.token}}
+
+?? status == 204
+
+### 6.3 Ana exclui a conta do roteiro
+# ESPERADO: 204.
+DELETE {{api}}/fontes-destinos/{{contaA.id}}
+Authorization: Bearer {{loginA.token}}
+
+?? status == 204
