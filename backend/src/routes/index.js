@@ -5,6 +5,7 @@ import categoriasRoutes from './categorias.routes.js';
 import fontesDestinosRoutes from './fontesDestinos.routes.js';
 import lancamentosRoutes from './lancamentos.routes.js';
 import relatoriosRoutes from './relatorios.routes.js';
+import saudeFinanceiraRoutes from './saudeFinanceira.routes.js';
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use('/categorias', categoriasRoutes);
 router.use('/fontes-destinos', fontesDestinosRoutes);
 router.use('/lancamentos', lancamentosRoutes);
 router.use('/relatorios', relatoriosRoutes);
+router.use('/saude-financeira', saudeFinanceiraRoutes);
 
 export default router;
