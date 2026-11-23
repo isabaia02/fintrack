@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import { useApi } from '../hooks/useApi';
 import { FaturaBloco } from './faturas/FaturaBloco';
 import { LimiteCartao } from './faturas/LimiteCartao';
 import { Carregando } from './ui/carregando';
@@ -12,36 +12,17 @@ const MESES_A_FRENTE = 3;
 
 export default function Faturas() {
   const navigate = useNavigate();
-  const [cartoes, setCartoes] = useState(null);
-  const [erro, setErro] = useState('');
   const [selecionado, setSelecionado] = useState(null);
-  const [versao, setVersao] = useState(0);
+  const { dados, carregando, erro, recarregar } = useApi(
+    '/relatorios/faturas',
+    { meses: MESES_A_FRENTE },
+    { mensagemErro: 'Não foi possível carregar as faturas.' },
+  );
 
-  useEffect(() => {
-    let ativo = true;
-    api.get('/relatorios/faturas', { params: { meses: MESES_A_FRENTE } })
-      .then(({ data }) => {
-        if (!ativo) return;
-        setCartoes(data.cartoes);
-        setErro('');
-      })
-      .catch((e) => {
-        if (!ativo) return;
-        setErro(e.response?.data?.erro ?? 'Não foi possível carregar as faturas.');
-        setCartoes(null);
-      });
-    return () => { ativo = false; };
-  }, [versao]);
+  if (erro) return <MensagemErro mensagem={erro} onTentarDeNovo={recarregar} />;
+  if (carregando) return <Carregando linhas={5} />;
 
-  const tentarDeNovo = () => {
-    setErro('');
-    setCartoes(null);
-    setVersao((v) => v + 1);
-  };
-
-  if (erro) return <MensagemErro mensagem={erro} onTentarDeNovo={tentarDeNovo} />;
-  if (!cartoes) return <Carregando linhas={5} />;
-
+  const { cartoes } = dados;
   if (cartoes.length === 0) {
     return (
       <ListaVazia
@@ -53,6 +34,7 @@ export default function Faturas() {
   }
 
   const cartao = cartoes.find((c) => c.id === selecionado) ?? cartoes[0];
+  const indiceAberta = Math.max(0, cartao.faturas.findIndex((f) => f.aberta));
 
   return (
     <div className="flex flex-col gap-6">
@@ -73,7 +55,12 @@ export default function Faturas() {
       <section aria-labelledby="titulo-faturas" className="flex flex-col gap-3">
         <h2 id="titulo-faturas">Fatura atual e próximas</h2>
         {cartao.faturas.map((fatura, i) => (
-          <FaturaBloco key={`${cartao.id}-${fatura.referencia}`} fatura={fatura} inicialmenteAberta={i < 2} />
+          <FaturaBloco
+            key={`${cartao.id}-${fatura.referencia}`}
+            fatura={fatura}
+            fechada={i < indiceAberta}
+            inicialmenteAberta={i === indiceAberta || i === indiceAberta + 1}
+          />
         ))}
       </section>
     </div>

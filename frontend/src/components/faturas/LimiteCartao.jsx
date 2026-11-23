@@ -7,7 +7,8 @@ export function LimiteCartao({ cartao }) {
   const { limite, limite_utilizado: utilizado, limite_disponivel: disponivel } = cartao;
   const percentual = limite > 0 ? (utilizado / limite) * 100 : 0;
   const estourado = disponivel < 0;
-  const corBarra = percentual >= 100 ? 'bg-danger' : percentual > LIMIAR_AVISO ? 'bg-warning' : 'bg-primary';
+  const critico = estourado || percentual >= 100;
+  const corBarra = critico ? 'bg-danger' : percentual > LIMIAR_AVISO ? 'bg-warning' : 'bg-primary';
 
   return (
     <section aria-label="Limite do cartão" className="flex flex-col gap-3">
@@ -41,11 +42,11 @@ export function LimiteCartao({ cartao }) {
         <span>Fecha dia {cartao.dia_fechamento} · vence dia {cartao.dia_vencimento}</span>
       </div>
 
-      {percentual > LIMIAR_AVISO && (
-        <Aviso tom="alerta">
-          {estourado
-            ? `Limite ultrapassado em ${formatarMoeda(-disponivel)}.`
-            : `Você já usou ${formatarPercentual(percentual)} do limite. Restam ${formatarMoeda(disponivel)}.`}
+      {(critico || percentual > LIMIAR_AVISO) && (
+        <Aviso tom={critico ? 'erro' : 'alerta'}>
+          {estourado && `Limite ultrapassado em ${formatarMoeda(-disponivel)}.`}
+          {!estourado && critico && 'Você atingiu o limite do cartão.'}
+          {!critico && `Você já usou ${formatarPercentual(percentual)} do limite. Restam ${formatarMoeda(disponivel)}.`}
         </Aviso>
       )}
     </section>
