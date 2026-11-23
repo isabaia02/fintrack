@@ -76,6 +76,8 @@ export default function FontesDestinos() {
     recarregar();
   };
 
+  // Item com lançamentos já abre o aviso de bloqueio. O 409 de confirmarExclusao continua
+  // como fallback (ex.: outra aba criou um lançamento depois de a lista ser carregada).
   const pedirExclusao = (item) => {
     if (item.total_lancamentos > 0) {
       setBloqueio(mensagemExclusaoBloqueada(item.total_lancamentos));

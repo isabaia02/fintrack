@@ -5,8 +5,31 @@ import { MoneyText } from '../ui/money-text';
 import { formatarMoeda } from '../../utils/formatadores';
 import { descricaoDoItem, iconeDoItem } from './rotulos';
 
+const bloco = 'animate-pulse rounded-sm bg-surface-sunken';
+
+// Reserva o espaço do valor enquanto os relatórios carregam, para a linha não mudar de tamanho quando ele chega.
+function EsqueletoValor({ tipo }) {
+  const cartao = tipo === 'cartao_credito';
+  return (
+    <div aria-hidden="true" className="flex flex-col items-end gap-1.5">
+      <span className={`h-4 ${cartao ? 'w-[180px]' : 'w-28'} ${bloco}`} />
+      <span className={cartao ? `h-1.5 w-[200px] ${bloco}` : `h-3 w-20 ${bloco}`} />
+    </div>
+  );
+}
+
+// O valor de rendas e contas é o movimento do mês corrente (BE-08), não o saldo acumulado: a legenda deixa isso claro.
+function ValorDoMes({ valor, legenda, comSinal }) {
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <MoneyText valor={valor} comSinal={comSinal} />
+      <p className="text-xs whitespace-nowrap text-text-muted">{legenda}</p>
+    </div>
+  );
+}
+
 function ValorDoItem({ item, valores }) {
-  if (valores === undefined) return null;
+  if (valores === undefined) return <EsqueletoValor tipo={item.tipo} />;
   if (valores === null) {
     return (
       <p className="text-sm text-text-subtle">
@@ -17,8 +40,8 @@ function ValorDoItem({ item, valores }) {
   }
 
   const valor = valores.get(item.id) ?? 0;
-  if (item.tipo === 'renda') return <MoneyText valor={valor} />;
-  if (item.tipo === 'conta') return <MoneyText valor={valor} comSinal={false} />;
+  if (item.tipo === 'renda') return <ValorDoMes valor={valor} legenda="Entradas no mês" comSinal />;
+  if (item.tipo === 'conta') return <ValorDoMes valor={valor} legenda="Movimento no mês" comSinal={false} />;
   return (
     <div className="flex flex-col items-end gap-1.5">
       <p className="text-xs whitespace-nowrap text-text-muted">
