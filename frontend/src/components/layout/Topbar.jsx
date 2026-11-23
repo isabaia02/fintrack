@@ -4,7 +4,7 @@ import { Button } from '../ui/button';
 import { SeletorPeriodo } from '../ui/seletor-periodo';
 import { ACAO_PADRAO, paginaDaRota } from './navegacao';
 
-export default function Topbar() {
+export default function Topbar({ acaoBloqueada = false }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const pagina = paginaDaRota(pathname);

@@ -65,3 +65,16 @@ export function rotuloMes(ano, mes) {
   const nome = new Date(Date.UTC(ano, mes, 1)).toLocaleDateString('pt-BR', { month: 'long', timeZone: 'UTC' });
   return `${nome.charAt(0).toUpperCase()}${nome.slice(1)} ${ano}`;
 }
+
+export function formatarPercentual(valor, casas = 1) {
+  const numero = (Number(valor) || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: casas,
+    maximumFractionDigits: casas,
+  });
+  return `${numero}%`;
+}
+
+export function dataDeHoje() {
+  const d = new Date();
+  return [d.getFullYear(), d.getMonth() + 1, d.getDate()].map((n) => String(n).padStart(2, '0')).join('-');
+}
