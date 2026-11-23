@@ -46,6 +46,13 @@ Utilitários puros (`cpfValido`, `calcularFatura`, `dividirEmParcelas`, `somarMe
 
 Usuários do seed: `ana@email.com` e `bruno@email.com` (senha `senha1234`).
 
+### Roteiro de verificação da API
+[`docs/roteiro-seguranca.http`](docs/roteiro-seguranca.http) reúne requisições prontas (formato [httpyac](https://httpyac.github.io/), extensão do VS Code ou CLI), com o resultado esperado em cada uma como asserção: cadastro duplicado (e-mail/CPF), login, acesso sem token (401), isolamento entre usuários (404) e compra parcelada. Com a API no ar (`npm run dev`) e o banco populado (`npm run db:seed`), rode tudo de uma vez:
+```bash
+npx httpyac send docs/roteiro-seguranca.http --all
+```
+O login com senha errada conta para o limite de tentativas (10 em 15 min por IP): se rodar o roteiro muitas vezes seguidas e começar a receber 429, espere ou reinicie a API.
+
 ### Testes do back-end
 ```bash
 cd backend
