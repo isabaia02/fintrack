@@ -367,6 +367,8 @@ GET {{api}}/lancamentos?inicio=2026-01-01&fim=2026-01-31
 Authorization: Bearer {{loginB.token}}
 
 ?? status == 200
+?? js response.parsedBody.itens.some((l) => l.id === lancamentoA[0].id) == false
+?? js response.parsedBody.itens.some((l) => l.descricao === 'Lançamento privado da Ana') == false
 
 ### 4.10 Bruno tenta usar a categoria e a conta da Ana ao criar lançamento
 # ESPERADO: 400 {"erro":"Dados inválidos.","campos":{
@@ -443,6 +445,27 @@ Authorization: Bearer {{loginA.token}}
 
 ?? status == 200
 ?? js response.parsedBody.descricao == Lançamento privado da Ana
+?? js response.parsedBody.valor == 99.9
+
+### 4.17 Ana confirma que a conta continua dela
+# ESPERADO: 200 — a conta {{contaA.id}} segue na lista da Ana, com o nome original
+# (o Bruno tentou editá-la e excluí-la em 4.11 e 4.12).
+GET {{api}}/fontes-destinos
+Authorization: Bearer {{loginA.token}}
+
+?? status == 200
+?? js response.parsedBody.some((f) => f.id === contaA.id) == true
+?? js response.parsedBody.some((f) => f.nome === 'Conta do Bruno agora') == false
+
+### 4.18 Ana confirma que a categoria continua dela
+# ESPERADO: 200 — a categoria {{categoriasA[0].id}} segue na lista da Ana, sem o nome
+# "Categoria roubada" (o Bruno tentou editá-la e excluí-la em 4.13 e 4.14).
+GET {{api}}/categorias
+Authorization: Bearer {{loginA.token}}
+
+?? status == 200
+?? js response.parsedBody.some((c) => c.id === categoriasA[0].id) == true
+?? js response.parsedBody.some((c) => c.nome === 'Categoria roubada') == false
 
 ###############################################################################
 # 5. COMPRA PARCELADA
@@ -492,6 +515,8 @@ Authorization: Bearer {{loginA.token}}
 ?? js response.parsedBody[0].valor == 33.34
 ?? js response.parsedBody[1].valor == 33.33
 ?? js response.parsedBody[2].valor == 33.33
+?? js response.parsedBody.map((p) => p.data).join() == 2026-01-15,2026-02-15,2026-03-15
+?? js new Set(response.parsedBody.map((p) => p.grupo_parcelamento)).size == 1
 
 ### 5.3 Ana consulta as parcelas no período
 # ESPERADO: 200; itens com parcela_atual/total_parcelas "1/3", "2/3", "3/3"
@@ -501,6 +526,7 @@ Authorization: Bearer {{loginA.token}}
 
 ?? status == 200
 ?? js response.parsedBody.itens.length == 3
+?? js response.parsedBody.itens.map((p) => `${p.parcela_atual}/${p.total_parcelas}`).sort().join() == 1/3,2/3,3/3
 
 ### 5.4 Bruno tenta ler uma parcela da compra da Ana
 # ESPERADO: 404 {"erro":"Lançamento não encontrado."}
@@ -597,11 +623,19 @@ Authorization: Bearer {{loginA.token}}
 ?? js response.parsedBody.campos.parcelas exists
 
 ### 5.10 Ana exclui só a parcela 2 (as demais são renumeradas)
-# ESPERADO: 204 sem corpo. Depois, a consulta 5.3 mostra 2 parcelas: 1/2 e 2/2.
+# ESPERADO: 204 sem corpo. Depois, a consulta 5.10b mostra 2 parcelas: 1/2 e 2/2.
 DELETE {{api}}/lancamentos/{{compraParcelada[1].id}}
 Authorization: Bearer {{loginA.token}}
 
 ?? status == 204
+
+### 5.10b As parcelas restantes foram renumeradas
+# ESPERADO: 200; itens 1/2 (2026-01-15) e 2/2 (2026-03-15): a compra agora tem 2 parcelas.
+GET {{api}}/lancamentos?inicio=2026-01-01&fim=2026-03-31&fonteDestinoId={{cartaoA.id}}
+Authorization: Bearer {{loginA.token}}
+
+?? status == 200
+?? js response.parsedBody.itens.map((p) => `${p.parcela_atual}/${p.total_parcelas}`).sort().join() == 1/2,2/2
 
 ### 5.11 Ana exclui TODAS as parcelas restantes da compra
 # ESPERADO: 204 sem corpo; a consulta 5.3 volta vazia (itens: []).
