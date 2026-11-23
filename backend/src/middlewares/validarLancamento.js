@@ -1,6 +1,7 @@
 import { MAX_PARCELAS } from '../models/parcelamento.js';
 import { idValido } from '../utils/id.js';
 import { dataValida, lerPeriodo } from '../utils/periodo.js';
+import { limparTexto } from '../utils/texto.js';
 
 export const TIPOS_LANCAMENTO = ['entrada', 'saida'];
 
@@ -17,7 +18,7 @@ function erroValor(valor) {
 export function validarDadosLancamento(corpo = {}) {
   const campos = {};
   const { tipo, valor, data } = corpo;
-  const descricao = typeof corpo.descricao === 'string' ? corpo.descricao.trim() : '';
+  const descricao = limparTexto(corpo.descricao);
 
   if (vazio(tipo)) campos.tipo = 'Informe o tipo (entrada ou saída).';
   else if (!TIPOS_LANCAMENTO.includes(tipo)) campos.tipo = 'O tipo deve ser "entrada" ou "saida".';

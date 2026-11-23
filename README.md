@@ -61,6 +61,13 @@ Usuários do seed: `ana@email.com` e `bruno@email.com` (senha `senha1234`).
 
 **Divergências conhecidas.** No documento de design, o Notebook 3/10 está na fatura do Visa, mas não na lista nem nos totais de novembro. Decidimos manter o Notebook, porque sem ele nenhuma tela de cartão bateria. Com isso, novembro fica com saídas de R$ 2.666,64 e saldo de R$ 4.683,36 (no design: R$ 2.216,64 e R$ 5.133,36), e o Visa aparece com R$ 555,34 no relatório por fonte/destino (no design: R$ 105,34). Pelo mesmo motivo, as parcelas 1/10 e 2/10 entram em setembro e outubro como Educação. Os saldos das contas no design (Conta corrente R$ 3.133,36 e Poupança R$ 2.000,00) não podem ser reproduzidos, porque o `saldo` da API é o movimento do mês na conta (ver "Relatório por fonte/destino"). No seed, a Conta corrente fica com −R$ 1.200,00 em novembro. A Poupança fica com R$ 0,00 no mês e R$ 2.000,00 acumulados, que é o que a reserva de emergência da Saúde financeira usa.
 
+### Roteiro de verificação da API
+[`docs/roteiro-seguranca.http`](docs/roteiro-seguranca.http) reúne requisições prontas (formato [httpyac](https://httpyac.github.io/), extensão do VS Code ou CLI), com o resultado esperado em cada uma como asserção: cadastro duplicado (e-mail/CPF), login, acesso sem token (401), isolamento entre usuários (404) e compra parcelada. Com a API no ar (`npm run dev`) e o banco populado (`npm run db:seed`), rode tudo de uma vez:
+```bash
+npx httpyac send docs/roteiro-seguranca.http --all
+```
+O login com senha errada conta para o limite de tentativas (10 em 15 min por IP): se rodar o roteiro muitas vezes seguidas e começar a receber 429, espere ou reinicie a API.
+
 ### Testes do back-end
 ```bash
 cd backend
@@ -173,6 +180,24 @@ Regras de fontes e destinos: o nome é único por usuário **e tipo** (uma conta
 **Limites e referências.** As metas (10% de poupança, 3 a 6 meses de reserva, 50/30/20) são referências educativas comuns, não recomendação financeira; por isso a resposta sempre traz `aviso`. Limitações: a projeção é uma extrapolação do passado recente (não prevê aumento de salário, férias nem compras futuras à vista); a reserva só considera lançamentos feitos na própria conta de reserva (uma transferência registrada como saída de outra conta não aparece lá); e as saídas no cartão contam na data da compra (ou da parcela), não no pagamento da fatura.
 
 **Dicas por IA (opcional).** Se `ANTHROPIC_API_KEY` estiver no `.env` (modelo em `IA_MODELO`, padrão `claude-haiku-5-5`), até 2 dicas extras da IA vêm depois das dicas por regras, com `origem: "ia"`. Só saem do servidor o `id`, o `status` e o `valor` de cada indicador: nenhum nome, e-mail, CPF, descrição de lançamento ou nome de conta/cartão. A chamada usa esforço baixo e saída estruturada (JSON `{ "dicas": [...] }`), lê o texto no bloco do tipo `text` (podem vir blocos de `thinking` antes) e tem limite de 4 s e, em qualquer falha (sem chave, rede, tempo esgotado, erro do serviço, resposta fora do formato), a rota segue normalmente só com as dicas por regras e registra um aviso no log do servidor.
+
+### Segurança (revisão BE-10)
+Cada item do checklist abaixo tem teste automatizado (`backend/test/seguranca*.test.js`; os que usam o banco rodam com `TEST_DATABASE_URL`).
+
+| Item | Como está | Onde |
+|---|---|---|
+| CORS restrito | Só as origens de `CORS_ORIGIN` (lista separada por vírgula; `*` é recusado e, em produção, a variável é obrigatória). Métodos `GET/POST/PUT/PATCH/DELETE` e cabeçalhos `Authorization`/`Content-Type`. Outras origens não recebem cabeçalho CORS. | `config/ambiente.js`, `app.js` |
+| Rate limit no login | 10 tentativas **que falham** por IP a cada 15 min (`LOGIN_RATE_LIMIT_MAX`); depois, `429`. Acertos e pedidos inválidos (`400`) não contam. O cadastro também é limitado (20 por IP por hora, `CADASTRO_RATE_LIMIT_MAX`), porque o `409` revela e-mails e CPFs já usados. Atrás de proxy, defina `TRUST_PROXY` com o **número de proxies** à frente do servidor (ex.: `1`) para o limite enxergar o IP real; também aceita `loopback`, lista de IPs/sub-redes e `false`. Evite `true`: o cliente passa a forjar o IP pelo `X-Forwarded-For` e escapa do limite (a subida avisa). | `middlewares/limitarLogin.js` |
+| Consultas parametrizadas | Todos os valores vão em `$1, $2...`. Os poucos trechos de SQL montados por interpolação são constantes do código (`SELECT_COM_TOTAL`, `filtro`, `ORDEM`...) e índices de parâmetro. Um teste lê o código-fonte e falha se qualquer SQL interpolar outra coisa. | `test/seguranca.test.js` |
+| Validação e sanitização | Tipos, tamanhos, intervalos e datas validados antes de chegar ao banco (corpo, query e `:id`). Nomes e descrições trocam tab e quebras de linha por espaço e perdem os demais caracteres de controle (incluindo os C1 e os de direção do Unicode, que inverteriam a exibição do texto), além dos espaços nas pontas (o `NUL` derrubaria o Postgres com `500`); e-mail e senha com caracteres de controle são recusados (o bcrypt cortaria a senha no `NUL`). HTML não é alterado: a API só devolve JSON e o front escapa na exibição. Corpo acima de 100 KB dá `413`. | `utils/texto.js`, `middlewares/validar*.js` |
+| Sem `senha_hash` nas respostas | Cadastro, login e `/me` devolvem só `id`, `nome` e `email` (o CPF também não volta). Um teste varre as respostas procurando `senha_hash`, hash bcrypt, senha e CPF. | `models/usuario.js` |
+| Padrão `{ erro, campos }` | `erro` é sempre texto; `campos` (`{ campo: mensagem }`) aparece nos `400` de validação e nos `409` de um campo específico. Erros do leitor de JSON deixam de virar `500`: JSON malformado é `400`, corpo grande é `413`, charset não suportado é `415`. O `500` nunca mostra detalhes do erro. | `middlewares/erros.js` |
+| Códigos HTTP | `200/201/204` sucesso; `400` dados inválidos; `401` sem token, token inválido ou expirado; `404` recurso inexistente ou de outro usuário; `409` conflito (nome repetido, item com lançamentos); `429` limite de tentativas; `500` erro interno. | todas as rotas |
+| Recurso de outro usuário = `404` | Toda consulta filtra por `usuario_id`. `GET/PUT/PATCH/DELETE` de categoria, fonte/destino ou lançamento de outra pessoa devolve o mesmo `404` de um id que não existe, assim como `:id` malformado (checado antes do corpo, no middleware `exigirIdValido`, que entrega o id convertido em `req.idRecurso`). Os testes tentam todas as rotas com `:id` e confirmam que o dado original não mudou. Ao **criar** um lançamento apontando para categoria/fonte de outra pessoa, a resposta é `400` em `campos.categoriaId`/`campos.fonteDestinoId` (o id está no corpo, não na URL) e nada é gravado. | `models/*.js`, `middlewares/validarId.js` |
+| `.env` fora do Git | `.env` e `.env.*` estão no `.gitignore` (só `.env.example` é versionado) e nunca foram commitados. Na subida, o servidor exige `DATABASE_URL` e `JWT_SECRET`; segredo com menos de 32 caracteres (ou o do `.env.example`) gera aviso e, com `NODE_ENV=production`, impede a subida. | `.gitignore`, `config/ambiente.js` |
+| Cabeçalhos | `X-Powered-By` desligado; `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` e `Cache-Control: no-store` (dados financeiros não ficam em cache). | `middlewares/cabecalhosSeguranca.js` |
+
+Limitações conhecidas: o limite de tentativas é por IP (não por conta) e fica na memória do processo, então reinicia com o servidor e não é compartilhado entre instâncias; o JWT dura `JWT_EXPIRES_IN` (1 h) e não há revogação antes disso.
 
 ## Design system (front-end)
 - Tokens do Figma em `frontend/src/index.css`, com modo claro e escuro (`[data-theme="dark"]`). Use as classes do Tailwind (`bg-surface`, `text-text-muted`, `border-border-strong`...), sem cores soltas.
