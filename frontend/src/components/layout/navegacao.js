@@ -5,7 +5,7 @@ export const PAGINAS = [
   { caminho: '/lancamentos', titulo: 'Lançamentos', icone: 'receipt_long' },
   { caminho: '/relatorios', titulo: 'Relatórios', icone: 'bar_chart', acao: null },
   { caminho: '/faturas', titulo: 'Faturas', icone: 'credit_card', acao: null },
-  { caminho: '/saude-financeira', titulo: 'Saúde financeira', icone: 'health_and_safety' },
+  { caminho: '/saude-financeira', titulo: 'Saúde financeira', icone: 'health_and_safety', acao: null },
   { divisor: true },
   {
     caminho: '/categorias',
