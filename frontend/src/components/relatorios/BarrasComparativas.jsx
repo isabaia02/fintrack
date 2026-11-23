@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatarMoeda, formatarVariacao } from '../../utils/formatadores';
 import { fundoDaCategoria } from '../../utils/cores';
 
-const MIN_VISIVEL = 1.5; 
+const MIN_VISIVEL = 1.5;
+const LARGURA_DICA = 240;
+const ALTURA_DICA = 88;
+const MARGEM = 8;
 
 const largura = (valor, maximo) => (valor > 0 && maximo > 0 ? Math.max((valor / maximo) * 100, MIN_VISIVEL) : 0);
 
@@ -19,9 +22,33 @@ function Barra({ valor, maximo, fundo }) {
 
 export function BarrasComparativas({ categorias, comparar }) {
   const [dica, setDica] = useState(null);
+  const grafico = useRef(null);
   const maximo = Math.max(0, ...categorias.map((c) => Math.max(c.total, comparar ? c.totalAnterior : 0)));
 
-  const mostrar = (categoria) => (e) => setDica({ categoria, x: e.clientX, y: e.clientY });
+  const posicionar = (categoria, e) => setDica({ categoria, x: e.clientX, y: e.clientY });
+
+  const aoEntrar = (categoria) => (e) => { if (e.pointerType === 'mouse') posicionar(categoria, e); };
+  const aoTocar = (categoria) => (e) => {
+    if (e.pointerType === 'mouse') return;
+    setDica((atual) => (atual?.categoria.id === categoria.id ? null : { categoria, x: e.clientX, y: e.clientY }));
+  };
+
+  useEffect(() => {
+    if (!dica) return undefined;
+    const fora = (e) => { if (!grafico.current?.contains(e.target)) setDica(null); };
+    const esc = (e) => { if (e.key === 'Escape') setDica(null); };
+    document.addEventListener('pointerdown', fora);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', fora);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [dica]);
+
+  const posicaoDica = dica && {
+    left: Math.max(MARGEM, Math.min(dica.x + 12, window.innerWidth - LARGURA_DICA - MARGEM)),
+    top: Math.max(MARGEM, Math.min(dica.y + 12, window.innerHeight - ALTURA_DICA - MARGEM)),
+  };
 
   return (
     <div className="flex min-w-0 flex-col gap-5 rounded-md border border-border bg-surface p-6 lg:w-[456px] lg:shrink-0">
@@ -41,16 +68,18 @@ export function BarrasComparativas({ categorias, comparar }) {
       </ul>
 
       <div
+        ref={grafico}
         role="img"
         aria-label="Gráfico de barras das saídas por categoria. Os mesmos valores estão na tabela."
-        onMouseLeave={() => setDica(null)}
+        onPointerLeave={(e) => { if (e.pointerType === 'mouse') setDica(null); }}
         className="flex flex-col gap-5"
       >
         {categorias.map((categoria) => (
           <div
             key={categoria.id}
-            onMouseEnter={mostrar(categoria)}
-            onMouseMove={mostrar(categoria)}
+            onPointerEnter={aoEntrar(categoria)}
+            onPointerMove={aoEntrar(categoria)}
+            onPointerDown={aoTocar(categoria)}
             className="flex flex-col gap-1.5"
           >
             <p className="text-sm font-medium">{categoria.nome}</p>
@@ -63,8 +92,8 @@ export function BarrasComparativas({ categorias, comparar }) {
       {dica && (
         <div
           role="tooltip"
-          style={{ left: dica.x + 12, top: dica.y + 12 }}
-          className="pointer-events-none fixed z-20 flex flex-col gap-0.5 rounded-sm border border-border bg-surface px-3 py-2 text-xs whitespace-nowrap shadow-popover"
+          style={posicaoDica}
+          className="pointer-events-none fixed z-20 flex max-w-60 flex-col gap-0.5 rounded-sm border border-border bg-surface px-3 py-2 text-xs shadow-popover"
         >
           <span className="text-text-muted">{dica.categoria.nome}</span>
           <span className="font-mono">{formatarMoeda(dica.categoria.total)}</span>
