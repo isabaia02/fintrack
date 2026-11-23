@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import api from '../../services/api';
 import { dataDeHoje, mascararValor, valorDaMascara } from '../../utils/formatadores';
 import { MAX_PARCELAS, calcularFatura, resumirParcelas } from '../../utils/parcelamento';
@@ -268,6 +269,7 @@ function Formulario({ item, categorias, fontes, aoCancelar, aoSalvar }) {
 
 function useLancamento(id) {
   const [estado, setEstado] = useState({ id: null, item: null, erro: '' });
+  const { mostrarErro } = useOutletContext();
 
   useEffect(() => {
     if (!id) return undefined;
@@ -275,10 +277,10 @@ function useLancamento(id) {
     api.get(`/lancamentos/${id}`)
       .then(({ data }) => { if (ativo) setEstado({ id, item: data, erro: '' }); })
       .catch((e) => {
-        if (ativo) setEstado({ id, item: null, erro: e.response?.data?.erro ?? 'Não foi possível carregar o lançamento.' });
+        if (ativo && !mostrarErro(e)) setEstado({ id, item: null, erro: e.response?.data?.erro ?? 'Não foi possível carregar o lançamento.' });
       });
     return () => { ativo = false; };
-  }, [id]);
+  }, [id, mostrarErro]);
 
   return estado.id === id ? estado : { item: null, erro: '' };
 }

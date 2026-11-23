@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { Carregando } from './ui/carregando';
 import { MensagemErro } from './ui/mensagem-erro';
@@ -9,6 +9,7 @@ import { DialogoConfirmarExclusao, DialogoExclusaoBloqueada } from './ui/dialogo
 
 export default function Categorias() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { mostrarErro } = useOutletContext();
   const [categorias, setCategorias] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
@@ -33,13 +34,13 @@ export default function Categorias() {
         setErro('');
       })
       .catch((e) => {
-        if (ativo) setErro(e.response?.data?.erro ?? 'Não foi possível carregar as categorias.');
+        if (ativo && !mostrarErro(e)) setErro(e.response?.data?.erro ?? 'Não foi possível carregar as categorias.');
       })
       .finally(() => {
         if (ativo) setCarregando(false);
       });
     return () => { ativo = false; };
-  }, [versao]);
+  }, [versao, mostrarErro]);
 
   const fecharFormulario = () => {
     setEditando(null);
