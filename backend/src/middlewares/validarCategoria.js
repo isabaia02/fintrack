@@ -1,9 +1,11 @@
+import { limparTexto } from '../utils/texto.js';
+
 const TIPOS = ['entrada', 'saida'];
 
 function validar({ tipoObrigatorio }) {
   return (req, res, next) => {
     const corpo = req.body ?? {};
-    const nome = typeof corpo.nome === 'string' ? corpo.nome.trim() : '';
+    const nome = limparTexto(corpo.nome);
     const campos = {};
 
     if (!nome) campos.nome = 'Informe o nome da categoria.';

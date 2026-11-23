@@ -1,11 +1,11 @@
 import { cpfValido } from '../models/cpf.js';
-import { normalizarEmail, texto } from '../utils/texto.js';
+import { limparTexto, normalizarEmail, temControle, texto } from '../utils/texto.js';
 
 const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export function validarCadastro(req, res, next) {
   const corpo = req.body ?? {};
-  const nome = texto(corpo.nome).trim();
+  const nome = limparTexto(corpo.nome);
   const email = normalizarEmail(corpo.email);
   const cpf = texto(corpo.cpf).replace(/\D/g, '');
   const senha = texto(corpo.senha);
@@ -15,12 +15,13 @@ export function validarCadastro(req, res, next) {
   else if (nome.length > 120) campos.nome = 'O nome deve ter no máximo 120 caracteres.';
 
   if (!email) campos.email = 'Informe o e-mail.';
-  else if (!REGEX_EMAIL.test(email) || email.length > 160) campos.email = 'Informe um e-mail válido.';
+  else if (!REGEX_EMAIL.test(email) || temControle(email) || email.length > 160) campos.email = 'Informe um e-mail válido.';
 
   if (!cpf) campos.cpf = 'Informe o CPF.';
   else if (!cpfValido(cpf)) campos.cpf = 'Informe um CPF válido.';
 
   if (!senha) campos.senha = 'Informe a senha.';
+  else if (temControle(senha)) campos.senha = 'A senha não pode ter caracteres de controle.';
   else if (senha.length < 8 || !/[A-Za-z]/.test(senha) || !/\d/.test(senha)) {
     campos.senha = 'A senha deve ter no mínimo 8 caracteres, com letras e números.';
   } else if (Buffer.byteLength(senha) > 72) {
